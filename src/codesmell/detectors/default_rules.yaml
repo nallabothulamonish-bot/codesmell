@@ -1,0 +1,347 @@
+# Rule-based code smell thresholds.
+#
+# Every absolute threshold cites where it comes from. Values without a citation
+# are marked `heuristic` -- they are defensible defaults, not published
+# findings, and the distinction matters when these numbers appear in a paper.
+#
+# `percentile` gives the project-relative alternative: the threshold becomes
+# that percentile of the metric's distribution across entities of the same type
+# in the project being analysed. Absolute thresholds do not transfer between
+# codebases; percentile thresholds are the cheap version of the
+# project-relative framing the ML pipeline explores at M5.
+#
+# Adding a smell means adding a block here. No Python changes are required.
+
+version: 1
+
+# Reusable exemption blocks. Threshold detectors have poor precision without
+# these, and it is not a tuning problem: some classes are *supposed* to look
+# the way a rule punishes. An exception subclass is meant to be three lines
+# with no methods. An enum is meant to be nothing but data. A Protocol is meant
+# to have no implementation. Flagging them is a false positive by construction.
+#
+# Patterns are full-match regular expressions.
+
+exemption_sets:
+
+  intentionally_minimal:
+    base_class_matches:
+      - "Exception"
+      - "BaseException"
+      - ".*Error"
+      - ".*Exception"
+      - "Enum"
+      - "StrEnum"
+      - "IntEnum"
+      - "IntFlag"
+      - "Flag"
+      - "Protocol"
+      - "ABC"
+      - "ABCMeta"
+      - "NamedTuple"
+      - "TypedDict"
+    name_matches:
+      - ".*Error"
+      - ".*Exception"
+      - ".*Protocol"
+      - ".*Interface"
+      - "Meta"
+      - "Config"
+
+  intentionally_data:
+    base_class_matches:
+      - "Enum"
+      - "StrEnum"
+      - "IntEnum"
+      - "IntFlag"
+      - "Flag"
+      - "NamedTuple"
+      - "TypedDict"
+      - "BaseModel"
+      - "BaseSettings"
+      - "Protocol"
+    decorated_with:
+      - "dataclass"
+      - "attrs"
+      - "attr\\.s"
+      - "define"
+      - "frozen"
+
+  no_receiver:
+    decorated_with:
+      - "staticmethod"
+      - "classmethod"
+      - "property"
+      - "cached_property"
+
+smells:
+
+  # ------------------------------------------------------------------ #
+  # Class-level
+  # ------------------------------------------------------------------ #
+
+  god_class:
+    entity_type: class
+    combinator: all
+    exempt_if:
+      use: [intentionally_data]
+    rationale: >-
+      A class that centralises intelligence: it does too much work itself,
+      is poorly cohesive, and reaches into many other classes to do it.
+      The three conditions together separate a genuine God Class from a
+      merely large but well-factored one.
+    references:
+      - "Lanza & Marinescu (2006), Object-Oriented Metrics in Practice, ch. 5"
+      - "Fowler (2018), Refactoring, 2nd ed. -- Large Class"
+    conditions:
+      - metric: wmc
+        op: ">="
+        absolute: 47        # Lanza & Marinescu VERY HIGH for WMC
+        percentile: 90
+      - metric: lcom_hs
+        op: ">"
+        absolute: 0.725     # Lanza & Marinescu cohesion cutoff (as 1 - TCC)
+        percentile: 75
+      - metric: cbo
+        op: ">"
+        absolute: 5         # ATFD "few" threshold
+        percentile: 75
+
+  large_class:
+    entity_type: class
+    combinator: all
+    rationale: >-
+      Size alone, with no cohesion or coupling qualifier. Kept separate from
+      God Class on purpose: a large class is a weaker signal, and collapsing
+      the two would inflate God Class counts with ordinary big classes.
+    references:
+      - "Fowler (2018), Refactoring, 2nd ed. -- Large Class"
+      - "heuristic: 200 LOC is a widely used industry review threshold"
+    conditions:
+      - metric: loc
+        op: ">"
+        absolute: 200
+        percentile: 90
+      - metric: number_of_methods
+        op: ">"
+        absolute: 20
+        percentile: 90
+
+  data_class:
+    entity_type: class
+    combinator: all
+    exempt_if:
+      use: [intentionally_data]
+    rationale: >-
+      A class holding fields with almost no behaviour. Its data is manipulated
+      elsewhere, so the logic that belongs with it lives somewhere else --
+      usually inside a God Class.
+    references:
+      - "Fowler (2018), Refactoring, 2nd ed. -- Data Class"
+      - "Lanza & Marinescu (2006), ch. 5"
+    conditions:
+      - metric: number_of_fields
+        op: ">="
+        absolute: 3
+        percentile: 60
+      - metric: wmc
+        op: "<"
+        absolute: 12        # Lanza & Marinescu LOW for WMC
+        percentile: 30
+      - metric: number_of_public_methods
+        op: "<="
+        absolute: 2
+
+  lazy_class:
+    entity_type: class
+    combinator: all
+    exempt_if:
+      use: [intentionally_minimal, intentionally_data]
+    rationale: >-
+      A class doing so little it does not earn its own file. Often the residue
+      of a refactoring that moved behaviour elsewhere and never removed the
+      shell.
+    references:
+      - "Fowler (2018), Refactoring, 2nd ed. -- Lazy Element"
+      - "heuristic thresholds"
+    conditions:
+      - metric: wmc
+        op: "<="
+        absolute: 3
+      - metric: loc
+        op: "<"
+        absolute: 25
+      - metric: number_of_methods
+        op: "<="
+        absolute: 2
+
+  refused_bequest:
+    entity_type: class
+    combinator: all
+    exempt_if:
+      use: [intentionally_minimal, intentionally_data]
+    rationale: >-
+      A subclass that inherits an interface it barely uses. Signals that
+      inheritance was chosen where composition or delegation belonged.
+    references:
+      - "Fowler (2018), Refactoring, 2nd ed. -- Refused Bequest"
+    conditions:
+      - metric: dit
+        op: ">="
+        absolute: 2
+      - metric: number_of_methods
+        op: "<="
+        absolute: 2
+      - metric: wmc
+        op: "<="
+        absolute: 5
+
+  # ------------------------------------------------------------------ #
+  # Method-level
+  # ------------------------------------------------------------------ #
+
+  long_method:
+    entity_type: method
+    combinator: all
+    rationale: >-
+      A method long enough that it cannot be understood without scrolling.
+      Length alone, with no complexity qualifier -- Brain Method covers the
+      dense case.
+    references:
+      - "Fowler (2018), Refactoring, 2nd ed. -- Long Function"
+      - "Lanza & Marinescu (2006): 65 LOC is HIGH for a method"
+    conditions:
+      - metric: loc
+        op: ">"
+        absolute: 65
+        percentile: 90
+
+  brain_method:
+    entity_type: method
+    combinator: all
+    rationale: >-
+      A method that concentrates the intelligence of its class: long, densely
+      branching, deeply nested and juggling many variables at once. The
+      combination is what distinguishes it from a merely long method.
+    references:
+      - "Lanza & Marinescu (2006), Object-Oriented Metrics in Practice, ch. 5"
+    conditions:
+      - metric: loc
+        op: ">"
+        absolute: 32        # half of HIGH, per Lanza & Marinescu
+        percentile: 85
+      - metric: cyclomatic_complexity
+        op: ">="
+        absolute: 8
+        percentile: 85
+      - metric: nesting_depth
+        op: ">="
+        absolute: 3
+        percentile: 80
+      - metric: local_variable_count
+        op: ">"
+        absolute: 8
+        percentile: 80
+
+  complex_method:
+    entity_type: method
+    combinator: any
+    rationale: >-
+      Either measure of complexity past its accepted limit. Cognitive
+      complexity is included because it penalises nesting, catching methods
+      that are hard to read despite a modest path count.
+    references:
+      - "McCabe (1976): cyclomatic complexity above 10 indicates high risk"
+      - "Campbell (2018), Cognitive Complexity, SonarSource -- default limit 15"
+    conditions:
+      - metric: cyclomatic_complexity
+        op: ">"
+        absolute: 10
+        percentile: 90
+      - metric: cognitive_complexity
+        op: ">"
+        absolute: 15
+        percentile: 90
+
+  long_parameter_list:
+    entity_type: method
+    combinator: all
+    rationale: >-
+      Too many parameters to hold in mind at a call site. Counted excluding
+      the receiver, so a method is not penalised for being a method.
+    references:
+      - "Fowler (2018), Refactoring, 2nd ed. -- Long Parameter List"
+    conditions:
+      - metric: parameter_count_excluding_self
+        op: ">"
+        absolute: 5
+        percentile: 95
+
+  deep_nesting:
+    entity_type: method
+    combinator: all
+    rationale: >-
+      Control structures nested past the point where a reader can track the
+      conditions that led to a line.
+    references:
+      - "Lanza & Marinescu (2006): MAXNESTING above 5 flags a Brain Method"
+    conditions:
+      - metric: nesting_depth
+        op: ">="
+        absolute: 5
+        percentile: 95
+
+  feature_envy:
+    entity_type: method
+    combinator: all
+    exempt_if:
+      # A staticmethod has no `self` to be envious with, and a property is a
+      # thin accessor by design.
+      use: [no_receiver]
+    rationale: >-
+      A method more interested in another object's data than its own. The
+      canonical refactoring is Move Method, so the finding is directly
+      actionable.
+    references:
+      - "Fowler (2018), Refactoring, 2nd ed. -- Feature Envy"
+      - "Lanza & Marinescu (2006): LAA below 1/3 with ATFD above few"
+    conditions:
+      - metric: foreign_access_ratio
+        op: ">"
+        absolute: 0.667     # LAA < 1/3 expressed as foreign share > 2/3
+        percentile: 80
+      - metric: accessed_field_count
+        op: "<="
+        absolute: 2
+      - metric: call_count
+        op: ">="
+        absolute: 3
+
+  message_chain:
+    entity_type: method
+    combinator: all
+    rationale: >-
+      A navigation chain that couples the caller to the shape of a whole
+      object graph. A Law of Demeter violation by construction.
+    references:
+      - "Fowler (2018), Refactoring, 2nd ed. -- Message Chains"
+      - "heuristic: chains of 4 or more links"
+    conditions:
+      - metric: max_message_chain
+        op: ">="
+        absolute: 4
+        percentile: 95
+
+  magic_number:
+    entity_type: method
+    combinator: all
+    rationale: >-
+      Unexplained numeric literals. 0, 1, -1 and 2 are excluded upstream as
+      indexing idioms, so what remains is genuinely unexplained.
+    references:
+      - "Martin (2008), Clean Code, ch. 17 -- G25 Replace Magic Numbers"
+    conditions:
+      - metric: magic_number_count
+        op: ">="
+        absolute: 4
+        percentile: 90

@@ -1,0 +1,2 @@
+[console_scripts]
+codesmell = codesmell.cli:main

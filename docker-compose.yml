@@ -1,0 +1,73 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: codesmell
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-codesmell}
+      POSTGRES_DB: codesmell
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U codesmell -d codesmell"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  migrate:
+    build: .
+    image: codesmell:0.7.0
+    command: ["db", "upgrade"]
+    environment: &codesmell_env
+      CODESMELL_ENVIRONMENT: staging
+      CODESMELL_DATABASE__URL: postgresql+psycopg://codesmell:${POSTGRES_PASSWORD:-codesmell}@db:5432/codesmell
+      CODESMELL_DATABASE__AUTO_MIGRATE: "false"
+      CODESMELL_WORKSPACE_ROOT: /var/lib/codesmell/workspaces
+      CODESMELL_API__STORAGE_ROOT: /var/lib/codesmell/data
+      CODESMELL_SECURITY__AUTH_ENABLED: "true"
+      CODESMELL_SECURITY__JWT_SECRET: ${CODESMELL_JWT_SECRET:-local-development-jwt-secret-change-before-sharing}
+      CODESMELL_SECURITY__BOOTSTRAP_ADMIN_EMAIL: ${CODESMELL_ADMIN_EMAIL:-admin@local.test}
+      CODESMELL_SECURITY__BOOTSTRAP_ADMIN_PASSWORD: ${CODESMELL_ADMIN_PASSWORD:-ChangeMe12345}
+      CODESMELL_SECURITY__BOOTSTRAP_ADMIN_NAME: ${CODESMELL_ADMIN_NAME:-Local Administrator}
+      CODESMELL_SECURITY__TRUSTED_HOSTS: '["localhost","127.0.0.1","api","frontend","testserver"]'
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    image: codesmell:0.7.0
+    command: ["api", "serve", "--host", "0.0.0.0", "--port", "8000"]
+    environment: *codesmell_env
+    ports:
+      - "8000:8000"
+    volumes:
+      - codesmell_data:/var/lib/codesmell
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  worker:
+    image: codesmell:0.7.0
+    command: ["worker", "run", "--no-migrate"]
+    environment: *codesmell_env
+    volumes:
+      - codesmell_data:/var/lib/codesmell
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    image: codesmell-frontend:0.7.0
+    ports:
+      - "8080:80"
+    depends_on:
+      api:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  codesmell_data:

@@ -1,0 +1,40 @@
+﻿# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local database
+*.db
+*.sqlite
+*.sqlite3
+
+# CodeSmell runtime/local data
+.codesmell-data/
+
+# Frontend dependencies/build
+frontend/node_modules/
+frontend/dist/
+node_modules/
+dist/
+
+# Environment variables / secrets
+.env
+.env.*
+!.env.example
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp

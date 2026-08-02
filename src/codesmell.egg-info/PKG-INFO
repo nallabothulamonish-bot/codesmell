@@ -1,0 +1,581 @@
+Metadata-Version: 2.4
+Name: codesmell
+Version: 0.7.0
+Summary: Explainable and cross-project code smell detection using software metrics
+License: MIT
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: pydantic>=2.6
+Requires-Dist: pydantic-settings>=2.2
+Requires-Dist: typer>=0.12
+Requires-Dist: rich>=13.7
+Requires-Dist: pyyaml>=6.0
+Requires-Dist: scikit-learn<2.0,>=1.4
+Requires-Dist: joblib>=1.3
+Requires-Dist: numpy<3.0,>=1.26
+Requires-Dist: shap<1.0,>=0.47
+Requires-Dist: fastapi<1.0,>=0.115
+Requires-Dist: uvicorn[standard]<1.0,>=0.34
+Requires-Dist: sqlalchemy<3.0,>=2.0
+Requires-Dist: alembic<2.0,>=1.14
+Requires-Dist: python-multipart<1.0,>=0.0.20
+Requires-Dist: psycopg[binary]<4.0,>=3.2
+Requires-Dist: PyJWT<3.0,>=2.9
+Requires-Dist: argon2-cffi<26.0,>=23.1
+Requires-Dist: reportlab<5.0,>=4.2
+Requires-Dist: matplotlib<4.0,>=3.9
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0; extra == "dev"
+Requires-Dist: pytest-cov>=5.0; extra == "dev"
+Requires-Dist: ruff>=0.4; extra == "dev"
+Requires-Dist: mypy>=1.10; extra == "dev"
+Requires-Dist: types-PyYAML>=6.0; extra == "dev"
+Requires-Dist: httpx<1.0,>=0.28; extra == "dev"
+
+# Explainable and Cross-Project Code Smell Detection Using Software Metrics
+
+Research-grade static analysis and machine learning platform that detects code
+smells, explains every prediction, and — the part that makes it research —
+measures how well those predictions transfer to projects the model has never
+seen.
+
+**Current status: M0-M9 complete** (secure ingestion, metrics, rule baseline,
+blinded datasets, leakage-safe cross-project ML, persistent FastAPI jobs, trusted
+model serving, SHAP explanations, React dashboard, role-based authentication,
+versioned reports, research exports and production deployment). Python-first.
+
+---
+
+## What works today
+
+```bash
+pip install -e ".[dev]"
+
+codesmell ingest ./my-project          # a directory
+codesmell ingest ./project.zip         # an uploaded archive
+codesmell ingest ./module.py           # a single file
+codesmell ingest https://github.com/psf/requests   # a public repository
+
+codesmell ingest ./my-project --json --rejections
+codesmell config                       # effective settings and wired plugins
+
+codesmell analyze ./my-project                       # 32 metrics per class
+codesmell analyze ./my-project --type method \
+    --sort cognitive_complexity --limit 20           # 33 metrics per method
+codesmell analyze https://github.com/psf/requests --sort wmc
+
+codesmell detect ./my-project                        # rule-based baseline
+codesmell detect ./my-project --explain              # condition trail per finding
+codesmell detect ./my-project --thresholds percentile   # project-relative
+codesmell detect ./my-project --json | jq            # baseline evidence
+
+# M4: create a blinded human-review bundle from one or more projects
+codesmell dataset create ./project-a ./project-b -o dataset_m4
+codesmell dataset validate dataset_m4/review_tasks.csv
+codesmell dataset validate dataset_m4/review_tasks.csv --require-complete
+codesmell dataset finalize dataset_m4/review_tasks.csv -o labels.csv
+codesmell dataset agreement reviewer_a.csv reviewer_b.csv \
+    --conflicts conflicts.csv
+
+# M5: leakage-safe machine learning
+codesmell ml prepare labels.csv ./project-a ./project-b -o training_features.csv
+codesmell ml train training_features.csv -o models_m5
+codesmell ml logo training_features.csv -o logo_m5
+
+# M6-M9: database, API, trusted models, authentication and persistent worker
+codesmell db upgrade
+codesmell model register models_m5/long_method/logistic --name "Long Method LR"
+codesmell model list
+codesmell api serve --reload       # terminal 1
+codesmell worker run              # terminal 2
+
+# M9: users, reports and publication exports
+codesmell user create admin@example.org --name "Administrator" --role admin
+codesmell report generate <analysis-job-id> --format pdf
+codesmell research summarize models_m5/holdout_report.json \
+    logo_m5/logo_report.json -o research_m9
+```
+
+`ingest` produces a `ProjectInventory`: source files, per-language counts,
+primary language, build tools, declared dependencies, everything refused and
+why, and a content fingerprint.
+
+`analyze` runs the two-pass metrics engine over it and ranks entities by any
+extracted metric.
+
+### Metrics extracted
+
+**Every entity** — LOC, SLOC, comment lines, blank lines, comment density,
+docstring presence, the full Halstead suite (vocabulary, length, volume,
+difficulty, effort, time, estimated bugs), maintainability index.
+
+**Classes (32 features)** — WMC, DIT, NOC, CBO, RFC, LCOM1, LCOM\*
+(Henderson-Sellers), fan-in, fan-out, method and field counts, public method
+count, average method complexity, base class count.
+
+**Methods and functions (33 features)** — cyclomatic complexity, cognitive
+complexity, max nesting depth, parameter counts, local variable count, return
+count, call and distinct-call counts, longest message chain, magic number
+count, foreign access ratio (the Feature Envy signal), accessed field count,
+decorator count.
+
+Class and method feature spaces are deliberately disjoint: LCOM is undefined
+for a method and nesting depth is undefined for a class. `FeatureSchema`
+enforces this and pins a stable column order, so a model trained today cannot
+misread a matrix built tomorrow.
+
+### Rule-based detection
+
+13 smells detected from YAML thresholds, no ML involved. Every threshold cites
+its source; values without a citation are marked `heuristic`, because the
+distinction matters when the numbers appear in a paper.
+
+Two threshold modes. **Absolute** uses published values (Lanza & Marinescu,
+McCabe, Fowler, Campbell). **Percentile** recomputes each threshold from the
+analysed project's own distribution.
+
+Running both on `psf/requests` produced a result worth recording: percentile
+mode gave 468 findings against absolute mode's 253, and the excess sat almost
+entirely in single-condition rules — `message_chain` went from 0 to 177,
+because the 95th percentile of chain length in that codebase is 2. **A
+percentile threshold flags a fixed share of entities by construction**, healthy
+project or not. Multi-condition rules resist the effect (God Class returns 6 in
+both modes) because a conjunction cannot be satisfied by distribution position
+alone.
+
+That is a limitation of project-relative *thresholding*, not of project-relative
+*framing* — and it sharpens the M5 plan: the percentile view belongs in feature
+scaling, where a model learns what a distribution position implies, not in
+thresholding, where it fixes the positive rate in advance.
+
+Rules carry **structural exemptions**, and they are not optional. The first run
+of these detectors on this project's own source produced 143 findings, 82 of
+which were exception subclasses and enums flagged as Lazy Class or Data Class.
+Those classes are *supposed* to look that way — it is a false positive by
+construction, not a threshold that needs tuning. With exemptions the same run
+produces 47 findings.
+
+## M4 human-labelling dataset workflow
+
+`codesmell dataset create` accepts one or more directories, ZIP archives,
+single Python files, or public HTTPS repositories. It analyses every project,
+uses M3 only to propose likely positives, samples same-entity-type controls,
+and writes a reproducible review bundle:
+
+```text
+dataset_m4/
+├── review_tasks.csv          # blinded reviewer sheet; no metrics or rule verdict
+├── candidate_evidence.csv    # rule verdict and condition trail, kept separate
+├── manifest.json             # provenance, fingerprints, sampling configuration
+├── LABELING_GUIDE.md         # protocol and smell catalogue
+└── snippets/                 # stable source snapshots for every reviewed entity
+```
+
+The reviewer enters `present`, `absent`, or `uncertain`, a human severity for
+present smells, a reviewer identifier, notes, and optionally a timestamp.
+`dataset validate` detects missing columns, duplicate task IDs, invalid labels,
+missing reviewer IDs, and inconsistent severity values. `dataset finalize`
+omits uncertain rows and writes a canonical labels-only CSV plus a SHA-256
+manifest. No rule evidence or software-metric column is copied into that file.
+M5 will verify the source fingerprint and recompute all features locally.
+
+For two independent reviewers, `dataset agreement` reports exact label
+agreement, Cohen's kappa over common binary decisions, severity agreement, and
+optionally writes disagreements to a conflict file for adjudication.
+
+Control sampling is deterministic: the configured seed is combined with each
+project fingerprint, so rerunning M4 on unchanged source produces identical task
+IDs, controls, snippets, and CSV ordering.
+
+> **These detectors are a baseline, not ground truth.** Running them over a
+> corpus and training on the output would produce a model that learns to
+> reproduce the rules — near-perfect scores, flawless cross-project transfer,
+> and a circular, meaningless paper. Their legitimate uses are: a non-ML
+> baseline the trained model must beat; a sanity check on the metrics engine;
+> a first pass for *human* labelling, where the rules propose candidates and
+> people adjudicate; and coverage where no training data exists at all.
+
+---
+
+
+## M5 machine-learning and cross-project evaluation
+
+`codesmell ml prepare` joins M4's canonical human labels to metrics recomputed
+from the exact reviewed source. Project fingerprints, source-file SHA-256 values
+and entity metadata are verified before rows are written. Dataset-supplied
+metric columns are never trusted.
+
+M5 trains a separate binary classifier for each smell, using either scaled
+Logistic Regression or a class-balanced Random Forest. Class and method feature
+spaces remain disjoint. `codesmell ml split` assigns whole projects to train or
+test; no project fingerprint can appear in both partitions.
+
+`codesmell ml train` performs an outer project holdout. Hyperparameters are
+selected with grouped inner cross-validation using only the outer-training
+projects, then the untouched project holdout is evaluated once. Every model
+folder contains `model.joblib` and a `model_card.json` recording the exact
+feature order, selected parameters, class balance, train/test projects, metrics
+and model SHA-256.
+
+`codesmell ml logo` runs leave-one-project-out evaluation. Every project becomes
+the outer test project once, with grouped tuning repeated only on the remaining
+projects. The report includes per-project folds, skipped-fold reasons, pooled
+micro metrics and macro means. One-class held-out projects are not hidden:
+ROC-AUC, PR-AUC and balanced accuracy are recorded as unavailable for those
+folds while threshold-based metrics remain available.
+
+```text
+training_features.csv
+training_features.csv.manifest.json
+models_m5/
+├── holdout_report.json
+├── predictions.csv
+└── <smell>/<model>/
+    ├── model.joblib
+    └── model_card.json
+logo_m5/
+├── logo_report.json
+└── logo_predictions.csv
+```
+
+See `M5_EXECUTION_GUIDE.md` for the full Windows workflow.
+
+---
+
+## M6 FastAPI backend and persistent analysis jobs
+
+M6 separates HTTP request handling from static analysis. The API safely stores
+a `.zip` or `.py` upload, or registers an allowed public HTTPS repository, then
+creates a durable database job. A separate worker atomically claims the oldest
+queued job, runs the existing sandboxed ingestion, metrics and rule-detection
+pipeline, and persists source metadata, entity metric vectors, findings and job
+events.
+
+SQLite is the zero-configuration local default. Alembic maintains the schema,
+and `docker compose up --build` runs PostgreSQL, a one-time migration service,
+the API and the worker. Worker heartbeats prevent a long analysis being claimed
+twice; stale jobs are requeued until their configured attempt limit is reached.
+
+Interactive API documentation is available at `/docs`. See
+`M6_EXECUTION_GUIDE.md` for local, curl and Docker workflows. M6 intentionally
+does not include authentication or public multi-tenant deployment controls.
+
+---
+
+## M7 trusted model serving and explainability
+
+M7 registers M5 model folders through an administrator CLI. Registration
+verifies `model.joblib` against the SHA-256 in `model_card.json`, validates the
+smell, supported model kind and exact `feature__...` order, then copies the
+artifact into private storage with restrictive permissions. The HTTP API does
+not accept arbitrary model uploads because joblib artifacts are pickle-based
+and must only be loaded from trusted, verified sources.
+
+Analysis jobs support three modes:
+
+- `rule`: M3 thresholds only.
+- `ml`: enabled registered models only.
+- `hybrid`: rule findings and ML predictions in the same job.
+
+The worker reconstructs every vector in the exact feature order recorded by the
+model card and stores the predicted class, probability, confidence and
+uncertainty. Logistic Regression pipelines use SHAP `LinearExplainer` in their
+standardized feature space; Random Forest models use `TreeExplainer`.
+Explanations are produced in batches, and deterministic model-native
+contributions remain available as a compatibility fallback.
+
+Positive predictions receive smell-specific refactoring guidance, the strongest
+metric evidence, and validation steps. Recommendations are advisory: they ask
+for characterization tests and re-analysis, not metric optimization at the
+expense of design.
+
+```text
+model_artifacts
+ml_predictions
+prediction_explanations
+recommendations
+```
+
+Important endpoints:
+
+```text
+GET   /api/v1/models
+PATCH /api/v1/models/{model_id}
+POST  /api/v1/projects/{project_id}/analyses
+GET   /api/v1/analyses/{job_id}/predictions
+GET   /api/v1/analyses/{job_id}/explanations
+GET   /api/v1/analyses/{job_id}/recommendations
+GET   /api/v1/predictions/{prediction_id}/explanation
+GET   /api/v1/predictions/{prediction_id}/recommendation
+```
+
+See `M7_EXECUTION_GUIDE.md` for the full local and Docker workflow.
+
+---
+
+
+## M8 React dashboard
+
+M8 provides a TypeScript browser client for project upload, public repository
+registration, analysis configuration, live job progress, findings, metric
+vectors, ML probabilities, local explanations, refactoring recommendations and
+the trusted model registry. Vite proxies the API during development; the
+production Nginx image serves the single-page application and proxies `/api`
+and `/health` to FastAPI.
+
+```bash
+cd frontend
+npm install
+npm run test
+npm run build
+npm run dev
+```
+
+## M9 authentication, reports and production release
+
+M9 completes the platform with shared-workspace role-based access control:
+
+- **Administrator** - users, models, projects, analyses and reports.
+- **Analyst** - projects, analyses and report generation.
+- **Viewer** - authenticated read-only access.
+
+Passwords are stored with Argon2id. FastAPI accepts short-lived signed bearer
+tokens and rechecks the user record on every request, so disabling an account
+also invalidates its future API access. The production configuration requires a
+non-default JWT secret, authentication, explicit trusted hosts, disabled
+automatic migrations and non-wildcard CORS.
+
+Every completed analysis can be exported as:
+
+- JSON with a versioned schema and complete machine-readable evidence.
+- A ZIP bundle of CSV tables suitable for statistical tools.
+- A standalone escaped HTML report.
+- A paginated PDF report generated with ReportLab.
+
+Each stored report records its SHA-256; downloads re-verify that digest. M9 also
+adds `codesmell research summarize`, which transforms M5 holdout and LOGO JSON
+into CSV tables, per-fold tables, macro metrics with 95% normal-approximation
+confidence intervals, PNG figures and a paper-oriented Markdown summary.
+
+Local Docker launch:
+
+```bash
+cp .env.example .env
+# Change the local administrator credentials in .env.
+docker compose up --build
+# Open http://localhost:8080
+```
+
+Production deployment uses `docker-compose.production.yml` and Caddy for HTTPS:
+
+```bash
+export CODESMELL_DOMAIN=codesmell.example.org
+export POSTGRES_PASSWORD='...'
+export CODESMELL_JWT_SECRET='at-least-32-random-characters...'
+export CODESMELL_ADMIN_EMAIL='admin@example.org'
+export CODESMELL_ADMIN_PASSWORD='StrongInitial123'
+docker compose -f docker-compose.production.yml up -d --build
+```
+
+See `M9_EXECUTION_GUIDE.md`, `docs/SECURITY.md`, `docs/DEPLOYMENT.md` and
+`docs/RESEARCH_EVALUATION.md`.
+
+---
+
+## Architecture
+
+Hexagonal. `core/` holds the domain model and the abstract ports; everything
+else is an adapter behind one of them. Nothing in `core/` performs I/O or
+imports a framework.
+
+```
+src/codesmell/
+├── core/                 # domain — no I/O, no frameworks, no dependencies
+│   ├── enums.py          # Language, EntityType, SmellType, Severity, ...
+│   ├── models.py         # frozen dataclasses: SourceFile, ProjectInventory, ...
+│   ├── ports.py          # ABCs: SourceParser, MetricCalculator, SmellDetector
+│   ├── registry.py       # generic plugin registry
+│   └── errors.py         # typed exceptions with stable codes
+├── config/
+│   ├── settings.py       # pydantic-settings, env-overridable
+│   └── logging.py        # structured JSON logs with job-id correlation
+├── ingestion/            # M1
+│   ├── sandbox.py        # per-job workspace, guaranteed teardown
+│   ├── archive.py        # hardened ZIP extraction
+│   ├── git.py            # validated shallow clone
+│   ├── filters.py        # path/content filtering
+│   ├── detection.py      # language, build tool, dependency detection
+│   ├── inventory.py      # the project census
+│   └── service.py        # orchestration
+├── languages/            # M2
+│   └── python/parser.py  # ast -> entities + language-agnostic facts
+├── detectors/            # M3
+│   ├── rules.py          # conditions, severity bands, exemptions
+│   ├── config.py         # YAML loading, validated against the live schema
+│   ├── thresholds.py     # per-project percentile distributions
+│   ├── engine.py         # detection + explainable findings
+│   └── default_rules.yaml
+├── dataset/              # M4
+│   ├── models.py         # review tasks, evidence and validation reports
+│   ├── builder.py        # deterministic candidate/control sampling
+│   ├── io.py             # review bundles and labels-only export
+│   └── validation.py     # schema validation and reviewer agreement
+├── ml/                   # M5
+│   ├── features.py       # verified labels -> recomputed feature dataset
+│   ├── splitting.py      # deterministic project-level holdout
+│   ├── tuning.py         # grouped inner hyperparameter selection
+│   ├── training.py       # per-smell models + holdout artifacts
+│   ├── logo.py           # leave-one-project-out evaluation
+│   ├── evaluation.py     # binary metrics and one-class handling
+│   ├── inference.py      # model hash/schema verification
+│   └── io.py             # strict M5 CSV schemas
+├── api/                  # M6-M9 API, auth, users, reports and storage
+├── auth/                 # M9 Argon2id, JWT and principals
+├── db/                   # M6-M9 SQLAlchemy models and Alembic migrations
+├── jobs/                 # M6-M7 queue, worker, rule/ML orchestration
+├── explain/              # M7 trusted registry, SHAP and recommendations
+├── reports/              # M9 JSON/CSV/HTML/PDF report generation
+├── research/             # M9 holdout/LOGO tables, intervals and figures
+├── metrics/              # M2
+│   ├── context.py        # cross-file symbol table (the second pass)
+│   ├── complexity.py     # size, cyclomatic, cognitive, nesting
+│   ├── halstead.py       # Halstead suite + maintainability index
+│   ├── oo.py             # CK suite, cohesion, method-level metrics
+│   └── engine.py         # two-pass orchestration + FeatureSchema
+├── container.py          # composition root
+└── cli.py
+```
+
+The engine runs in **two passes** — parse everything, then compute — because
+CBO, RFC, fan-in, DIT and NOC are undefined without a whole-project view. A
+single-pass engine still produces numbers; they are just quietly wrong, with
+nothing raising to say so.
+
+Adding a language, metric, smell detector or model means writing one class
+against a port in `core/ports.py` and adding one entry to a registry in
+`container.py`. No downstream module changes.
+
+---
+
+## Security model
+
+Uploaded archives and user-supplied URLs are treated as hostile.
+
+| Attack | Defence |
+|---|---|
+| zip-slip (`../../etc/passwd`) | every member path resolved and proven inside the workspace |
+| absolute-path members (`/etc/cron.d/x`, `C:/...`) | refused before extraction |
+| Windows-separator traversal (`..\..\x`) | separators normalised before the check |
+| symlink members | refused outright; a symlink can redirect a later write |
+| special files (FIFO, socket, device) | refused by file-type bits |
+| zip bombs | per-member, total-size and compression-ratio caps, enforced on **bytes actually written** rather than on the header's claim |
+| member floods | member-count cap |
+| SSRF via clone URL (`file://`, `ext::`, `169.254.169.254`, `localhost`) | HTTPS-only, host allowlist, no userinfo, default port only |
+| credential leak / hang on private repos | `GIT_TERMINAL_PROMPT=0`, no askpass, host SSH config stripped, hard timeout |
+| symlink escape during the walk | `os.walk(followlinks=False)`; symlinks recorded as rejections |
+| workspace leak | context manager tears down on success *and* exception; `0o700` |
+
+`tests/test_archive_security.py` covers each row. **Uploaded code is never
+executed or imported — only read and parsed.** Registered ML artifacts are a
+separate trusted-administrator input; their SHA-256 and model cards are checked
+before deserialization.
+
+Limits are settings, not constants; see `.env.example`. `git_allow_any_host`
+exists for local research and is refused outright in `production`.
+
+---
+
+## Development
+
+```bash
+make check        # ruff + mypy --strict + pytest
+make cov          # coverage report
+```
+
+Current: **395 tests passing, 83% branch coverage.** The repository remains configured for `mypy --strict`, Ruff and branch coverage through `make check` and `make cov`.
+
+Every metric is validated against a hand-computed expected value with the
+arithmetic written into the test. A metric that is merely self-consistent
+still produces publishable-looking numbers while being wrong, and nothing
+downstream would ever raise.
+
+Docker:
+
+```bash
+docker compose up --build               # PostgreSQL + migration + API + worker
+docker build -t codesmell . && docker run --rm codesmell version
+```
+
+---
+
+## Roadmap
+
+See `ARCHITECTURE_AND_ROADMAP.md` for the full analysis. In dependency order:
+
+| | Milestone | Status |
+|---|---|---|
+| M0 | Skeleton, ports, config, DI, CI | **done** |
+| M1 | Ingestion, sandbox, inventory | **done** |
+| M2 | Python parser + metrics engine | **done** |
+| M3 | Rule-based detectors (paper baseline) | **done** |
+| M4 | Dataset layer — blinded labels, validation, agreement | **done** |
+| M5 | ML pipeline + leave-one-project-out evaluation | **done** |
+| M6 | FastAPI, SQL database, uploads, persistent job queue | **done** |
+| M7 | Trusted model serving, SHAP explanations, recommendations | **done** |
+| M8 | React frontend | **done** |
+| M9 | Authentication, reports, audit, deployment and research exports | **done** |
+
+Three design decisions from the roadmap that constrain everything downstream:
+
+1. **Never train on dataset-supplied metric columns.** Public datasets ship
+   metrics computed by other tools; training on those and inferring with this
+   extractor produces a model that scores well offline and fails live. Datasets
+   supply labels; features are always recomputed here.
+2. **Cross-project means leave-one-project-out with nested tuning.** A random
+   split leaks and invalidates the central claim.
+3. **Class-level and method-level entities are separate models.** Their feature
+   spaces are disjoint; `EntityType` is a first-class key throughout.
+
+---
+
+## License
+
+MIT.
+
+## M8 — React Research Dashboard
+
+Version 0.7.0 includes the browser application under `frontend/`. It supports project upload and public repository registration, rule/ML/hybrid job configuration, live persistent-worker progress, finding and metric exploration, probability and uncertainty inspection, local feature-attribution charts, refactoring recommendations, and trusted model-registry controls.
+
+Local frontend:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Complete deployment:
+
+```bash
+docker compose up --build
+```
+
+Open `http://localhost:8080`. See `M8_EXECUTION_GUIDE.md` for the complete workflow.
+
+
+## M9 - Final Platform Release
+
+Version 0.7.0 completes the platform with Argon2id password hashing, signed JWT access tokens, administrator/analyst/viewer roles, account administration, mutation audit events, integrity-checked JSON/CSV/HTML/PDF reports, paper-oriented holdout and LOGO exports, a role-aware React interface, and hardened development and production Compose stacks.
+
+Run the final release locally:
+
+```bash
+codesmell db upgrade
+codesmell api serve --host 127.0.0.1 --port 8000
+# In another terminal
+codesmell worker run
+# In frontend/
+npm install && npm run dev
+```
+
+For container deployment, configure `.env` and use `docker compose up --build`. For HTTPS production deployment, use `docker-compose.production.yml` with a strong database password, a randomly generated JWT secret of at least 32 characters, an initial administrator account, and the public domain. See `M9_EXECUTION_GUIDE.md`, `docs/SECURITY.md`, `docs/DEPLOYMENT.md`, and `docs/RESEARCH_EVALUATION.md`.
