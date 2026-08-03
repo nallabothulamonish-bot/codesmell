@@ -1,0 +1,15 @@
+.git
+.codesmell-data
+.codesmell-workspaces
+codesmell.db
+frontend/
+docs/
+tests/
+demo_ml_model/
+.pytest_cache/
+.venv/
+*.md
+Makefile
+Caddyfile
+docker-compose*.yml
+Dockerfile
