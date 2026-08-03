@@ -60,7 +60,7 @@ where = ["src"]
 "codesmell.db.migrations" = ["script.py.mako", "versions/*.py"]
 
 [tool.vercel]
-entrypoint = "src.codesmell.api.app:app"
+entrypoint = "codesmell.api.app:app"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
