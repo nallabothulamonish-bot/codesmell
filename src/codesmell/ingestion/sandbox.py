@@ -127,15 +127,17 @@ class WorkspaceManager:
     def workspace_root(self) -> Path:
         return self._workspace_root
 
-    def create(self, job_id: str | None = None) -> Workspace:
+    def create(self, job_id: str | None = None, *, overwrite: bool = False) -> Workspace:
         job = job_id or uuid.uuid4().hex
         root = self._workspace_root / job
+        if root.exists():
+            if not overwrite:
+                raise WorkspaceError(
+                    "workspace already exists", job_id=job, path=str(root)
+                )
+            shutil.rmtree(root, ignore_errors=True)
         try:
-            root.mkdir(parents=True, exist_ok=False)
-        except FileExistsError as exc:
-            raise WorkspaceError(
-                "workspace already exists", job_id=job, path=str(root)
-            ) from exc
+            root.mkdir(parents=True, exist_ok=True)
         except OSError as exc:
             raise WorkspaceError(
                 f"cannot create workspace: {exc}", path=str(root)
@@ -149,7 +151,7 @@ class WorkspaceManager:
     @contextmanager
     def session(self, job_id: str | None = None) -> Iterator[Workspace]:
         """Yield a workspace and tear it down unconditionally afterwards."""
-        workspace = self.create(job_id)
+        workspace = self.create(job_id, overwrite=True)
         try:
             yield workspace
         finally:

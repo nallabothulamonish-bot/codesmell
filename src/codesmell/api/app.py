@@ -136,6 +136,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             content={"error": exc.code, "message": exc.message, "details": exc.details},
         )
 
+    @app.exception_handler(Exception)
+    async def _unhandled_error(request: Request, exc: Exception) -> JSONResponse:
+        import logging
+        logging.getLogger("codesmell.api").exception(
+            "Unhandled error on %s %s", request.method, request.url.path
+        )
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": "internal_error",
+                "message": "An unexpected error occurred. Check server logs for details.",
+            },
+        )
+
     app.include_router(health.router)
     app.include_router(auth.router)
     app.include_router(users.router)

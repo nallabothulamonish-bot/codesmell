@@ -102,7 +102,10 @@ def test_inventory_does_not_follow_symlinks(
     outside = tmp_path / "outside"
     outside.mkdir()
     (outside / "secret.py").write_text("SECRET = 1\n", encoding="utf-8")
-    (sample_project / "src" / "linked").symlink_to(outside, target_is_directory=True)
+    try:
+        (sample_project / "src" / "linked").symlink_to(outside, target_is_directory=True)
+    except OSError as exc:
+        pytest.skip(f"Symlinks not supported: {exc}")
 
     inventory = builder.build(
         sample_project, name="sample", source_kind=SourceKind.DIRECTORY

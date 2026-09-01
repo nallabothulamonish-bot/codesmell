@@ -14,7 +14,7 @@ const navigation = [
 export function AppLayout() {
   const { user, logout } = useAuth()
   const [open, setOpen] = useState(false)
-  const [dark, setDark] = useState(() => localStorage.getItem('theme') !== 'light')
+  const [dark, setDark] = useState(() => localStorage.getItem('theme') === 'dark')
 
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? 'dark' : 'light'
@@ -54,6 +54,7 @@ export function AppLayout() {
     </div>
   )
 }
+
 
 
 

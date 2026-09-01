@@ -1,4 +1,4 @@
-﻿# Python
+# Python
 .venv/
 venv/
 __pycache__/
@@ -38,3 +38,12 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+*BACKUP*
+*BEFORE*
+*REDESIGN*
+*.before-theme
+frontend_FRONTEND_INSPECTION.txt
+create_dummy_models.py
+frontend/frontend
+.codesmell-workspaces/
+

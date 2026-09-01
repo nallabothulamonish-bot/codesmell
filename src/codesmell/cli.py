@@ -50,7 +50,12 @@ app = typer.Typer(
     no_args_is_help=True,
     add_completion=False,
 )
-console = Console()
+
+class _ConsoleProxy:
+    def __getattr__(self, name: str):
+        return getattr(Console(), name)
+
+console = _ConsoleProxy()
 dataset_app = typer.Typer(
     name="dataset",
     help="M4 blinded human-labelling dataset workflow.",
@@ -225,6 +230,7 @@ def analyze(
 def _render_analysis(
     result: AnalysisResult, entity_type: EntityType, *, sort_by: str, limit: int
 ) -> None:
+    console = Console(file=sys.stdout, width=200)
     summary = Table(title=f"Analysis: {result.inventory.name}", show_header=False)
     summary.add_column("field", style="cyan")
     summary.add_column("value")

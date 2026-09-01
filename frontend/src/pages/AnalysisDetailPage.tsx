@@ -67,7 +67,16 @@ export function AnalysisDetailPage() {
   return <div className="page">
     <PageHeader title={project.data?.name ?? `Analysis ${compactId(job.id)}`} description={`${titleCase(job.analysis_kind)} analysis · ${job.progress_message}`} actions={<div className="inline-actions"><StatusBadge status={job.status} />{canMutate && isActive && <Button variant="danger" onClick={() => cancel.mutate()} disabled={cancel.isPending}><Square size={15} /> Cancel</Button>}{canMutate && ['failed', 'cancelled'].includes(job.status) && <Button onClick={() => retry.mutate()} disabled={retry.isPending}><RotateCcw size={16} /> Retry</Button>}<Link className="button button-secondary" to="/analyses">All jobs</Link></div>} />
     {actionError && <Notice tone="danger">{actionError.message}</Notice>}
-    {job.error_message && <Notice tone="danger"><strong>{job.error_code ?? 'Analysis failed'}:</strong> {job.error_message}</Notice>}
+    {job.error_message && (
+      <Notice tone="danger">
+        <strong>{job.error_code ?? 'Analysis failed'}:</strong> {job.error_message}
+        {(job.error_code === 'empty_project' || job.error_message.includes('empty_project')) && (
+          <div style={{ marginTop: 6, fontSize: '0.85em', opacity: 0.9 }}>
+            💡 <strong>Helpful Tip:</strong> The uploaded archive does not contain any analysable Python (<code>.py</code>) source code files. Please re-upload a project <code>.zip</code> containing valid Python code.
+          </div>
+        )}
+      </Notice>
+    )}
     {isActive && <div className="job-progress-card"><div><strong>{job.progress}%</strong><span>{job.progress_message || 'Waiting for worker'}</span></div><ProgressBar value={job.progress} /></div>}
     <Tabs items={tabs} active={tab} onChange={setTab} />
     {tab === 'overview' && <OverviewPanel analysis={job} findings={findings} predictions={predictions} recommendations={recommendations} />}

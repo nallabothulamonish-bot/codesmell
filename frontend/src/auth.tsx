@@ -8,6 +8,7 @@ interface AuthContextValue {
   loading: boolean
   error: Error | null
   login: (email: string, password: string) => Promise<void>
+  register: (payload: { email: string; display_name: string; password: string; role: string }) => Promise<void>
   logout: () => void
 }
 
@@ -31,6 +32,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     error,
     login: async (email, password) => {
       const result = await api.login(email, password)
+      setAccessToken(result.access_token)
+      setUser(result.user)
+      setError(null)
+    },
+    register: async (payload) => {
+      const result = await api.register(payload)
       setAccessToken(result.access_token)
       setUser(result.user)
       setError(null)

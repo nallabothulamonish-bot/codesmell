@@ -63,12 +63,12 @@ class SourceFile:
 
     @property
     def name(self) -> str:
-        return PurePosixPath(self.relative_path).name
+        return PurePosixPath(self.relative_path.replace("\\", "/")).name
 
     @property
     def package_path(self) -> str:
         """Dotted package path, e.g. ``pkg/sub/mod.py`` -> ``pkg.sub.mod``."""
-        p = PurePosixPath(self.relative_path)
+        p = PurePosixPath(self.relative_path.replace("\\", "/"))
         parts = list(p.parent.parts) if str(p.parent) != "." else []
         stem = p.stem
         if stem != "__init__":

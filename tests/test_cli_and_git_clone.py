@@ -91,11 +91,76 @@ def test_ingest_command_exits_nonzero_on_bad_source(tmp_path, monkeypatch):
 
 
 def _stub_git(tmp_path: Path, body: str, name: str = "git") -> Path:
-    """Write an executable shell script standing in for ``git``."""
-    script = tmp_path / name
-    script.write_text(f"#!/bin/sh\n{body}\n", encoding="utf-8")
-    script.chmod(script.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
-    return script
+    """Write an executable stub standing in for ``git``."""
+    import sys
+    py_code = f"""import sys, os, time, pathlib
+args = sys.argv[1:]
+body_text = {repr(body)}
+
+if "exit 128" in body_text:
+    sys.stderr.write("fatal: repository not found\\n")
+    sys.exit(128)
+
+if "sleep 30" in body_text:
+    time.sleep(30)
+    sys.exit(0)
+
+if args and args[0] == "rev-parse":
+    if "exit 1;" in body_text and "$1" in body_text:
+        sys.exit(1)
+    if "abc123def456" in body_text:
+        print("abc123def456")
+    else:
+        print("rev")
+    sys.exit(0)
+
+recorded_file = None
+for line in body_text.splitlines():
+    if "printf \\"%s\\\\n\\" \\"$@\\" >" in line or "env >" in line:
+        parts = line.split(">")
+        if len(parts) > 1:
+            recorded_file = parts[1].strip()
+
+if recorded_file:
+    rec_path = pathlib.Path(recorded_file)
+    if "env >" in body_text:
+        with open(rec_path, "w", encoding="utf-8") as f:
+            for k, v in os.environ.items():
+                f.write(f"{{k}}={{v}}\\n")
+    else:
+        with open(rec_path, "w", encoding="utf-8") as f:
+            for a in args:
+                f.write(f"{{a}}\\n")
+
+dest = args[-1] if args else None
+if dest and not dest.startswith("-"):
+    dest_path = pathlib.Path(dest)
+    dest_path.mkdir(parents=True, exist_ok=True)
+    (dest_path / ("main.py" if "main.py" in body_text else "a.py")).write_text("x = 1\\n")
+    if "ln -s" in body_text:
+        link_target = None
+        for word in body_text.split():
+            if "outside" in word:
+                link_target = word
+        if link_target:
+            try:
+                (dest_path / "link").symlink_to(pathlib.Path(link_target), target_is_directory=True)
+            except OSError:
+                pass
+sys.exit(0)
+"""
+    py_path = tmp_path / f"{name}_impl.py"
+    py_path.write_text(py_code, encoding="utf-8")
+
+    if sys.platform == "win32":
+        bat_script = tmp_path / f"{name}.bat"
+        bat_script.write_text(f'@echo off\n"{sys.executable}" "{py_path}" %*\n', encoding="utf-8")
+        return bat_script
+    else:
+        script = tmp_path / name
+        script.write_text(f'#!/bin/sh\n"{sys.executable}" "{py_path}" "$@"\n', encoding="utf-8")
+        script.chmod(script.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
+        return script
 
 
 @pytest.fixture

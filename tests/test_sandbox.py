@@ -13,10 +13,12 @@ from codesmell.ingestion.sandbox import WorkspaceManager
 
 
 def test_workspace_is_created_private(workspace_manager: WorkspaceManager):
+    import sys
     workspace = workspace_manager.create("job-1")
     try:
-        mode = stat.S_IMODE(workspace.root.stat().st_mode)
-        assert mode == 0o700, "uploaded source must not be world-readable"
+        if sys.platform != "win32":
+            mode = stat.S_IMODE(workspace.root.stat().st_mode)
+            assert mode == 0o700, "uploaded source must not be world-readable"
     finally:
         workspace.close()
 
@@ -81,7 +83,10 @@ def test_resolve_within_follows_symlinks_before_checking(workspace, tmp_path):
     outside = tmp_path / "outside"
     outside.mkdir()
     link = workspace.source_dir / "sneaky"
-    link.symlink_to(outside, target_is_directory=True)
+    try:
+        link.symlink_to(outside, target_is_directory=True)
+    except OSError as exc:
+        pytest.skip(f"Symlinks not supported: {exc}")
 
     with pytest.raises(PathEscapeError):
         workspace.resolve_within(workspace.source_dir, "sneaky/payload.py")

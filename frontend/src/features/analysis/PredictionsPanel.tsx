@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Card, EmptyState, StatusBadge } from '../../components/UI'
 import type { Explanation, Prediction } from '../../types/api'
 import { formatPercent, titleCase } from '../../utils/format'
@@ -31,7 +31,7 @@ export function PredictionsPanel({ predictions, explanations }: { predictions: P
         {explanation ? <>
           <div className="section-title"><h3>Local explanation</h3><span>{titleCase(explanation.method)}</span></div>
           {explanation.warning && <p className="warning-text">{explanation.warning}</p>}
-          {chart.length ? <ResponsiveContainer width="100%" height={Math.max(240, chart.length * 42)}><BarChart data={chart} layout="vertical" margin={{ left: 20, right: 20 }}><CartesianGrid strokeDasharray="3 3" horizontal={false} /><XAxis type="number" /><YAxis dataKey="feature" type="category" width={125} tick={{ fontSize: 11 }} /><Tooltip formatter={(value) => Number(value).toFixed(4)} /><Bar dataKey="contribution" radius={[0, 5, 5, 0]} /></BarChart></ResponsiveContainer> : <p>No feature attributions stored.</p>}
+          {chart.length ? <ResponsiveContainer width="100%" height={Math.max(240, chart.length * 42)}><BarChart data={chart} layout="vertical" margin={{ left: 20, right: 20 }}><CartesianGrid strokeDasharray="3 3" horizontal={false} /><XAxis type="number" /><YAxis dataKey="feature" type="category" width={125} tick={{ fontSize: 11 }} /><Tooltip formatter={(value: any) => Number(value).toFixed(4)} /><Bar dataKey="contribution" radius={[0, 5, 5, 0]}>{chart.map((entry, index) => <Cell key={index} fill={entry.contribution > 0 ? 'var(--color-danger)' : 'var(--color-success)'} />)}</Bar></BarChart></ResponsiveContainer> : <p>No feature attributions stored.</p>}
         </> : <p className="state-message">No local explanation stored for this prediction.</p>}
       </> : <EmptyState title="Select a prediction" message="Choose a model result to inspect probability and feature contributions." />}
     </Card>

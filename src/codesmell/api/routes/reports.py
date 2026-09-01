@@ -5,7 +5,7 @@ import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -126,6 +126,7 @@ def download_report(report_id: str, session: Session = Depends(get_session)) -> 
 
 @router.delete(
     "/reports/{report_id}",
+    response_class=Response,
     status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[Depends(require_roles("admin"))],
 )
@@ -134,7 +135,7 @@ def delete_report(
     request: Request,
     session: Session = Depends(get_session),
     principal: Principal = Depends(require_authenticated),
-) -> None:
+) -> Response:
     report = session.get(GeneratedReport, report_id)
     if report is None:
         raise HTTPException(status_code=404, detail="report not found")

@@ -58,12 +58,21 @@ export function DashboardPage() {
               <ResponsiveContainer width="100%" height={260}>
                 <PieChart>
                   <Pie data={severityData} dataKey="value" nameKey="name" innerRadius={58} outerRadius={92} paddingAngle={3}>
-                    {severityData.map((_, index) => <Cell key={index} className={`chart-slice slice-${index}`} />)}
+                    {severityData.map((entry, index) => {
+                      const SEVERITY_FILL: Record<string, string> = { Low: '#0ea5e9', Medium: '#f59e0b', High: '#f97316', Critical: '#f43f5e' }
+                      const FALLBACK = ['#10b981', '#f59e0b', '#f43f5e', '#6366f1', '#0ea5e9', '#8b5cf6']
+                      return <Cell key={index} fill={SEVERITY_FILL[entry.name] ?? FALLBACK[index % FALLBACK.length]} />
+                    })}
                   </Pie>
-                  <Tooltip contentStyle={{ borderRadius: 12 }} />
+                  <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, color: 'var(--text)' }} />
                 </PieChart>
               </ResponsiveContainer>
-              <div className="chart-legend">{severityData.map((item, index) => <div key={item.name}><span className={`legend-dot dot-${index}`} />{item.name}<strong>{item.value}</strong></div>)}</div>
+              <div className="chart-legend">{severityData.map((item, index) => {
+                const SEVERITY_FILL: Record<string, string> = { Low: '#0ea5e9', Medium: '#f59e0b', High: '#f97316', Critical: '#f43f5e' }
+                const FALLBACK = ['#10b981', '#f59e0b', '#f43f5e', '#6366f1', '#0ea5e9', '#8b5cf6']
+                const color = SEVERITY_FILL[item.name] ?? FALLBACK[index % FALLBACK.length]
+                return <div key={item.name}><span className="legend-dot" style={{ background: color }} />{item.name}<strong>{item.value}</strong></div>
+              })}</div>
             </div>
           ) : <EmptyState title="No findings yet" message="Complete an analysis to populate the severity chart." />}
         </Card>
@@ -72,7 +81,8 @@ export function DashboardPage() {
           <div className="card-heading"><div><h2>Top smell types</h2><p>Most frequent detections in the recent sample.</p></div><Gauge /></div>
           {smellData.length ? <div className="rank-list">{smellData.map((item, index) => {
             const max = smellData[0]?.value || 1
-            return <div className="rank-row" key={item.name}><div><span>{index + 1}</span><strong>{item.name}</strong><em>{item.value}</em></div><div className="mini-bar"><i style={{ width: `${(item.value / max) * 100}%` }} /></div></div>
+            const COLORS = ['#6366f1', '#8b5cf6', '#0ea5e9', '#10b981', '#f59e0b', '#f97316']
+            return <div className="rank-row" key={item.name}><div><span>{index + 1}</span><strong>{item.name}</strong><em>{item.value}</em></div><div className="mini-bar"><i style={{ width: `${(item.value / max) * 100}%`, background: COLORS[index % COLORS.length] }} /></div></div>
           })}</div> : <EmptyState title="No smell ranking" message="The ranking appears after a completed rule or hybrid analysis." />}
         </Card>
       </div>

@@ -20,6 +20,7 @@ import type {
 
 export const api = {
   login: (email: string, password: string) => request<TokenResponse>('/api/v1/auth/token', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  register: (payload: { email: string; display_name: string; password: string; role: string }) => request<TokenResponse>('/api/v1/auth/register', { method: 'POST', body: JSON.stringify(payload) }),
   me: () => request<User>('/api/v1/auth/me'),
   users: () => request<Page<User>>('/api/v1/users?limit=500'),
   createUser: (payload: { email: string; display_name: string; password: string; role: string; enabled: boolean }) => request<User>('/api/v1/users', { method: 'POST', body: JSON.stringify(payload) }),

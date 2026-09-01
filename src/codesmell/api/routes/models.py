@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -67,12 +67,17 @@ def set_model_state(
     return artifact
 
 
-@router.delete("/{model_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_roles("admin"))])
+@router.delete(
+    "/{model_id}",
+    response_class=Response,
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_roles("admin"))],
+)
 def delete_model(
     model_id: str,
     session: Session = Depends(get_session),
     settings: Settings = Depends(get_settings),
-) -> None:
+) -> Response:
     artifact = session.get(ModelArtifact, model_id)
     if artifact is None:
         raise HTTPException(status_code=404, detail="model not found")

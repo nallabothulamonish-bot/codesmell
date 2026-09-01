@@ -4,7 +4,7 @@ import shutil
 from pathlib import Path
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -107,12 +107,17 @@ def get_project(project_id: str, session: Session = Depends(get_session)) -> Pro
     return project
 
 
-@router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_roles("admin", "analyst"))])
+@router.delete(
+    "/{project_id}",
+    response_class=Response,
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_roles("admin", "analyst"))],
+)
 def delete_project(
     project_id: str,
     session: Session = Depends(get_session),
     storage: UploadStorage = Depends(get_storage),
-) -> None:
+) -> Response:
     project = session.get(Project, project_id)
     if project is None:
         raise HTTPException(status_code=404, detail="project not found")

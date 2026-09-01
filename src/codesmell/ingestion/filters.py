@@ -111,12 +111,12 @@ class PathFilter:
     # ------------------------------------------------------------------ #
 
     def language_of(self, relative_path: str) -> Language:
-        suffix = PurePosixPath(relative_path).suffix.lower()
+        suffix = PurePosixPath(relative_path.replace("\\", "/")).suffix.lower()
         return LANGUAGE_BY_SUFFIX.get(suffix, Language.UNKNOWN)
 
     def screen(self, relative_path: str, size_bytes: int) -> Rejection | None:
         """Return a :class:`Rejection` if the file must not be analysed."""
-        posix = PurePosixPath(relative_path)
+        posix = PurePosixPath(relative_path.replace("\\", "/"))
         name = posix.name
 
         for part in posix.parts[:-1]:
