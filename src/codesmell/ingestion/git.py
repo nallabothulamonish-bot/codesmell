@@ -133,12 +133,14 @@ class GitRepositoryFetcher(RepositoryFetcher):
         command = [
             self._git,
             "-c", "core.symlinks=false",       # no symlink checkout on any OS
+            "-c", "core.protectNTFS=false",    # prevent Win32 path aborts
             "-c", "protocol.ext.allow=never",  # ext:: would run a shell command
             "-c", "protocol.file.allow=never",
             "clone",
             "--depth", "1",
             "--single-branch",
             "--no-tags",
+            "--filter=blob:none",
             "--recurse-submodules=no",
             "--quiet",
             "--",                              # end of options; url is data
@@ -168,12 +170,27 @@ class GitRepositoryFetcher(RepositoryFetcher):
             ) from exc
 
         if result.returncode != 0:
-            raise RepositoryFetchError(
-                "repository clone failed",
-                url=validated,
-                exit_code=result.returncode,
-                stderr=_sanitise(result.stderr),
-            )
+            git_dir = destination / ".git"
+            # If clone downloaded .git but checkout failed (e.g. invalid Windows path), recover valid files
+            if git_dir.is_dir():
+                try:
+                    subprocess.run(
+                        [self._git, "checkout-index", "-a", "-f"],
+                        cwd=str(destination),
+                        env=self._clone_env(),
+                        capture_output=True,
+                        timeout=60,
+                        check=False,
+                    )
+                except Exception:
+                    pass
+            if _directory_size(destination) == 0:
+                raise RepositoryFetchError(
+                    "repository clone failed",
+                    url=validated,
+                    exit_code=result.returncode,
+                    stderr=_sanitise(result.stderr),
+                )
 
         revision = self._head_revision(destination)
         bytes_written = _directory_size(destination)

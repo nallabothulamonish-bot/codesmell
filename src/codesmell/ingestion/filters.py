@@ -49,9 +49,39 @@ DEFAULT_GENERATED_MARKERS: tuple[str, ...] = (
 
 #: Extension -> language. Extend here when a new parser adapter is registered.
 LANGUAGE_BY_SUFFIX: dict[str, Language] = {
+    # Python
     ".py": Language.PYTHON,
     ".pyi": Language.PYTHON,
+    # Java & Kotlin
     ".java": Language.JAVA,
+    ".kt": Language.KOTLIN,
+    ".kts": Language.KOTLIN,
+    # JavaScript / TypeScript / Web
+    ".js": Language.JAVASCRIPT,
+    ".jsx": Language.JAVASCRIPT,
+    ".mjs": Language.JAVASCRIPT,
+    ".cjs": Language.JAVASCRIPT,
+    ".ts": Language.TYPESCRIPT,
+    ".tsx": Language.TYPESCRIPT,
+    ".html": Language.HTML,
+    ".htm": Language.HTML,
+    ".css": Language.CSS,
+    ".scss": Language.CSS,
+    ".less": Language.CSS,
+    # C / C++ / C#
+    ".c": Language.C,
+    ".h": Language.C,
+    ".cpp": Language.CPP,
+    ".cxx": Language.CPP,
+    ".cc": Language.CPP,
+    ".hpp": Language.CPP,
+    ".cs": Language.CSHARP,
+    # Go / Rust / Swift / Ruby / PHP
+    ".go": Language.GO,
+    ".rs": Language.RUST,
+    ".swift": Language.SWIFT,
+    ".rb": Language.RUBY,
+    ".php": Language.PHP,
 }
 
 _NULL_SNIFF_BYTES = 8192
@@ -73,9 +103,7 @@ class PathFilter:
     #: project with a clear "no parser adapter" warning, rather than failing
     #: with a misleading "no source files found". The supported/unsupported
     #: distinction belongs to the parser layer, not the census.
-    languages: frozenset[Language] = field(
-        default_factory=lambda: frozenset(LANGUAGE_BY_SUFFIX.values())
-    )
+    languages: frozenset[Language] = field(default_factory=Language.supported)
     max_file_bytes: int = 4 * 1024 * 1024
     include_tests: bool = True
 
@@ -112,7 +140,9 @@ class PathFilter:
 
     def language_of(self, relative_path: str) -> Language:
         suffix = PurePosixPath(relative_path.replace("\\", "/")).suffix.lower()
-        return LANGUAGE_BY_SUFFIX.get(suffix, Language.UNKNOWN)
+        if not suffix:
+            return Language.UNKNOWN
+        return LANGUAGE_BY_SUFFIX.get(suffix, Language.OTHER)
 
     def screen(self, relative_path: str, size_bytes: int) -> Rejection | None:
         """Return a :class:`Rejection` if the file must not be analysed."""

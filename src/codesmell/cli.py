@@ -867,6 +867,25 @@ def ml_predict(
         raise typer.Exit(code=1) from exc
 
 
+@model_app.command("bootstrap")
+def model_bootstrap() -> None:
+    """Bootstrap default trained M5 model artifacts."""
+    from codesmell.db import create_db_engine, create_session_factory
+    from codesmell.db.migrate import upgrade_database
+    from codesmell.ml.bootstrap import bootstrap_default_models
+
+    settings = _cli_settings()
+    upgrade_database(settings)
+    engine = create_db_engine(settings)
+    try:
+        sessions = create_session_factory(engine)
+        with sessions() as session:
+            models = bootstrap_default_models(session, settings)
+            console.print(f"[green]bootstrapped {len(models)} model artifacts[/green]")
+    finally:
+        engine.dispose()
+
+
 @model_app.command("register")
 def model_register(
     model_dir: Annotated[

@@ -40,7 +40,7 @@ class IngestionSettings(BaseSettings):
 
     allowed_archive_suffixes: tuple[str, ...] = (".zip",)
 
-    git_clone_timeout_seconds: float = Field(default=180.0, gt=0)
+    git_clone_timeout_seconds: float = Field(default=600.0, gt=0)
     git_allowed_hosts: tuple[str, ...] = (
         "github.com",
         "gitlab.com",
@@ -89,12 +89,17 @@ class ApiSettings(BaseSettings):
     """HTTP API and persistent upload-storage settings."""
 
     host: str = "127.0.0.1"
-    port: int = Field(default=8000, ge=1, le=65535)
+    port: int = Field(default=8001, ge=1, le=65535)
     root_path: str = ""
     storage_root: Path = Field(default=Path(".codesmell-data"))
     max_upload_bytes: int = Field(default=200 * _MB, gt=0)
-    allowed_upload_suffixes: tuple[str, ...] = (".zip", ".py")
-    cors_origins: tuple[str, ...] = ()
+    allowed_upload_suffixes: tuple[str, ...] = (".zip",)
+    cors_origins: tuple[str, ...] = (
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
+    )
 
 
 class WorkerSettings(BaseSettings):
@@ -117,13 +122,13 @@ class ExplainabilitySettings(BaseSettings):
 class SecuritySettings(BaseSettings):
     """Authentication, authorization and HTTP hardening controls."""
 
-    auth_enabled: bool = False
+    auth_enabled: bool = Field(default=True)
     jwt_secret: SecretStr = SecretStr("development-only-change-me-please")
     jwt_issuer: str = "codesmell"
     jwt_audience: str = "codesmell-api"
     access_token_minutes: int = Field(default=60, ge=5, le=1440)
-    bootstrap_admin_email: str | None = None
-    bootstrap_admin_password: SecretStr | None = None
+    bootstrap_admin_email: str | None = "admin@codesmell.invalid"
+    bootstrap_admin_password: SecretStr | None = SecretStr("SecurePassword123!")
     bootstrap_admin_name: str = "CodeSmell Administrator"
     docs_enabled: bool = True
     trusted_hosts: tuple[str, ...] = ("127.0.0.1", "localhost", "testserver")

@@ -46,4 +46,6 @@ frontend_FRONTEND_INSPECTION.txt
 create_dummy_models.py
 frontend/frontend
 .codesmell-workspaces/
+scratch/
+*.db-*
 

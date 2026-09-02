@@ -72,7 +72,7 @@ export function AnalysisDetailPage() {
         <strong>{job.error_code ?? 'Analysis failed'}:</strong> {job.error_message}
         {(job.error_code === 'empty_project' || job.error_message.includes('empty_project')) && (
           <div style={{ marginTop: 6, fontSize: '0.85em', opacity: 0.9 }}>
-            💡 <strong>Helpful Tip:</strong> The uploaded archive does not contain any analysable Python (<code>.py</code>) source code files. Please re-upload a project <code>.zip</code> containing valid Python code.
+            💡 <strong>Helpful Tip:</strong> No analysable source code files (Java, JavaScript, TypeScript, C/C++, Python, Go, Rust, etc.) were found in the project root. Please ensure your project repository or <code>.zip</code> contains source code files.
           </div>
         )}
       </Notice>

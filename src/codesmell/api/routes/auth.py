@@ -1,3 +1,4 @@
+"""Authentication endpoints for login, user info, and self-registration."""
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -20,11 +21,6 @@ def login(
     session: Session = Depends(get_session),
     settings: Settings = Depends(get_settings),
 ) -> TokenOut:
-    if not settings.security.auth_enabled:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="authentication is disabled for this deployment",
-        )
     user = authenticate(session, payload.email, payload.password)
     if user is None:
         raise HTTPException(
@@ -62,11 +58,6 @@ def register(
     session: Session = Depends(get_session),
     settings: Settings = Depends(get_settings),
 ) -> TokenOut:
-    if not settings.security.auth_enabled:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="authentication is disabled for this deployment",
-        )
     from codesmell.auth.service import create_user
     try:
         user = create_user(

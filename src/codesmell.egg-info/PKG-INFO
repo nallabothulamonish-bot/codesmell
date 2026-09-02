@@ -3,7 +3,7 @@ Name: codesmell
 Version: 0.7.0
 Summary: Explainable and cross-project code smell detection using software metrics
 License: MIT
-Requires-Python: >=3.11
+Requires-Python: <3.13,>=3.11
 Description-Content-Type: text/markdown
 Requires-Dist: pydantic>=2.6
 Requires-Dist: pydantic-settings>=2.2
@@ -13,7 +13,6 @@ Requires-Dist: pyyaml>=6.0
 Requires-Dist: scikit-learn<2.0,>=1.4
 Requires-Dist: joblib>=1.3
 Requires-Dist: numpy<3.0,>=1.26
-Requires-Dist: shap<1.0,>=0.47
 Requires-Dist: fastapi<1.0,>=0.115
 Requires-Dist: uvicorn[standard]<1.0,>=0.34
 Requires-Dist: sqlalchemy<3.0,>=2.0
@@ -24,6 +23,10 @@ Requires-Dist: PyJWT<3.0,>=2.9
 Requires-Dist: argon2-cffi<26.0,>=23.1
 Requires-Dist: reportlab<5.0,>=4.2
 Requires-Dist: matplotlib<4.0,>=3.9
+Provides-Extra: shap
+Requires-Dist: shap<1.0,>=0.47; extra == "shap"
+Requires-Dist: numba>=0.59.0; extra == "shap"
+Requires-Dist: llvmlite>=0.42.0; extra == "shap"
 Provides-Extra: dev
 Requires-Dist: pytest>=8.0; extra == "dev"
 Requires-Dist: pytest-cov>=5.0; extra == "dev"

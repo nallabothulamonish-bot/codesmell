@@ -1,4 +1,4 @@
-"""FastAPI application factory for the final M9 platform."""
+"""FastAPI application factory for the platform."""
 
 from __future__ import annotations
 
@@ -49,7 +49,18 @@ def _bootstrap_admin(app: FastAPI, settings: Settings) -> None:
         )
 
 
+def _bootstrap_models(app: FastAPI, settings: Settings) -> None:
+    from codesmell.ml.bootstrap import bootstrap_default_models
+    try:
+        with app.state.session_factory() as session:
+            bootstrap_default_models(session, settings)
+    except Exception as exc:
+        import logging
+        logging.getLogger("codesmell.api").warning("failed to bootstrap default ML models: %s", exc)
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
+    get_settings.cache_clear()
     resolved = settings or get_settings()
 
     @asynccontextmanager
@@ -65,6 +76,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.session_factory = create_session_factory(engine)
         app.state.storage = UploadStorage(resolved.api)
         _bootstrap_admin(app, resolved)
+        _bootstrap_models(app, resolved)
         yield
         engine.dispose()
 
@@ -89,15 +101,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
     if resolved.security.force_https:
         app.add_middleware(HTTPSRedirectMiddleware)
-    if resolved.api.cors_origins:
-        app.add_middleware(
-            CORSMiddleware,
-            allow_origins=list(resolved.api.cors_origins),
-            allow_credentials=False,
-            allow_methods=["GET", "POST", "PATCH", "DELETE"],
-            allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
-            expose_headers=["X-Request-ID"],
-        )
+    cors_origins = list(resolved.api.cors_origins) or [
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        expose_headers=["X-Request-ID"],
+    )
 
     @app.middleware("http")
     async def _security_headers(request: Request, call_next):
@@ -152,6 +171,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(health.router)
     app.include_router(auth.router)
+    if not any(getattr(r, "path", None) == "/api/v1/auth/register" for r in app.routes):
+        from codesmell.api.routes.auth import register as register_route
+        from codesmell.api.schemas import TokenOut
+        app.post("/api/v1/auth/register", response_model=TokenOut, status_code=201, tags=["authentication"])(register_route)
     app.include_router(users.router)
     app.include_router(projects.router)
     app.include_router(models.router)

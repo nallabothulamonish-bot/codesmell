@@ -66,6 +66,10 @@ class Container:
         inspectable via :meth:`describe` and swappable in a test.
         """
         self.parsers.register(Language.PYTHON, PythonParser())
+        from codesmell.languages.universal.parser import UniversalParser
+        for lang in Language:
+            if lang != Language.PYTHON:
+                self.parsers.register(lang, UniversalParser(lang))
         for calculator in DEFAULT_CALCULATORS:
             self.metrics.register(type(calculator).__name__, calculator)
 

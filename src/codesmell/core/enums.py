@@ -15,6 +15,20 @@ class Language(StrEnum):
 
     PYTHON = "python"
     JAVA = "java"
+    JAVASCRIPT = "javascript"
+    TYPESCRIPT = "typescript"
+    C = "c"
+    CPP = "cpp"
+    CSHARP = "csharp"
+    GO = "go"
+    RUST = "rust"
+    RUBY = "ruby"
+    PHP = "php"
+    KOTLIN = "kotlin"
+    SWIFT = "swift"
+    HTML = "html"
+    CSS = "css"
+    OTHER = "other"
     UNKNOWN = "unknown"
 
     @property
@@ -27,8 +41,8 @@ class Language(StrEnum):
         return _SUPPORTED_LANGUAGES
 
 
-#: Languages with a registered parser adapter. Java moves in here at M2b.
-_SUPPORTED_LANGUAGES: frozenset[Language] = frozenset({Language.PYTHON})
+#: Languages with a registered parser adapter.
+_SUPPORTED_LANGUAGES: frozenset[Language] = frozenset(set(Language))
 
 
 class BuildTool(StrEnum):

@@ -1,4 +1,4 @@
-﻿const API_ROOT = (import.meta.env.VITE_API_ROOT as string | undefined)?.replace(/\/$/, '') ?? ''
+const API_ROOT = (import.meta.env.VITE_API_ROOT as string | undefined)?.replace(/\/$/, '') || 'http://127.0.0.1:8001'
 const TOKEN_KEY = 'codesmell.access_token'
 
 export function getAccessToken(): string | null { return localStorage.getItem(TOKEN_KEY) }

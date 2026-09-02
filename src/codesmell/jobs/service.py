@@ -372,7 +372,9 @@ class AnalysisWorker:
             "model_ids": [item.id for item in artifacts],
         }
         by_smell: dict[str, dict[str, int]] = {}
-        for artifact in artifacts:
+        for idx, artifact in enumerate(artifacts):
+            prog = 78 + int(15 * (idx + 1) / len(artifacts))
+            self._progress(job_id, prog, f"evaluating ML model {artifact.smell_type}")
             data = registry.verify(artifact)
             model = joblib.load(data.model_path)
             smell = SmellType(artifact.smell_type)
@@ -413,13 +415,13 @@ class AnalysisWorker:
                 else [None] * len(candidates)
             )
             smell_counts = {"predictions": 0, "positive": 0}
-            for (entity, vector, values), probability, explanation in zip(
-                candidates, probabilities, explanations, strict=True
-            ):
-                predicted = probability >= artifact.threshold
-                confidence = probability if predicted else 1.0 - probability
-                uncertainty = 1.0 - confidence
-                with self.sessions() as session:
+            with self.sessions() as session:
+                for (entity, vector, values), probability, explanation in zip(
+                    candidates, probabilities, explanations, strict=True
+                ):
+                    predicted = probability >= artifact.threshold
+                    confidence = probability if predicted else 1.0 - probability
+                    uncertainty = 1.0 - confidence
                     prediction = MLPredictionRecord(
                         job_id=job_id,
                         model_id=artifact.id,
@@ -478,12 +480,12 @@ class AnalysisWorker:
                             )
                         )
                         totals["recommendations"] = int(totals["recommendations"]) + 1
-                    session.commit()
-                totals["predictions"] = int(totals["predictions"]) + 1
-                smell_counts["predictions"] += 1
-                if predicted:
-                    totals["positive_predictions"] = int(totals["positive_predictions"]) + 1
-                    smell_counts["positive"] += 1
+                    totals["predictions"] = int(totals["predictions"]) + 1
+                    smell_counts["predictions"] += 1
+                    if predicted:
+                        totals["positive_predictions"] = int(totals["positive_predictions"]) + 1
+                        smell_counts["positive"] += 1
+                session.commit()
             by_smell[artifact.smell_type] = smell_counts
         totals["by_smell"] = by_smell
         return totals

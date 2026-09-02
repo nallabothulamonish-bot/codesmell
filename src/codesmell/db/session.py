@@ -27,6 +27,8 @@ def create_db_engine(settings: Settings) -> Engine:
         def _sqlite_fk(dbapi_connection: object, _record: object) -> None:
             cursor = dbapi_connection.cursor()  # type: ignore[attr-defined]
             cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA busy_timeout=30000")
             cursor.close()
     return engine
 

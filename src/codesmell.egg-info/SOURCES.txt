@@ -76,6 +76,7 @@ src/codesmell/jobs/service.py
 src/codesmell/languages/__init__.py
 src/codesmell/languages/python/__init__.py
 src/codesmell/languages/python/parser.py
+src/codesmell/languages/universal/parser.py
 src/codesmell/metrics/__init__.py
 src/codesmell/metrics/complexity.py
 src/codesmell/metrics/context.py

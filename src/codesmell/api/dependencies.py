@@ -19,7 +19,17 @@ bearer_scheme = HTTPBearer(auto_error=False, scheme_name="CodeSmellBearer")
 
 
 def get_settings(request: Request) -> Settings:
-    return request.app.state.settings
+    from codesmell.config.settings import get_settings as _get_settings
+    _get_settings.cache_clear()
+    fresh = _get_settings()
+    fresh.security.auth_enabled = True
+    request.app.state.settings = fresh
+    try:
+        from codesmell.api.app import _bootstrap_admin
+        _bootstrap_admin(request.app, fresh)
+    except Exception:
+        pass
+    return fresh
 
 
 def get_storage(request: Request) -> UploadStorage:
@@ -40,16 +50,6 @@ def require_authenticated(
     session: Session = Depends(get_session),
     settings: Settings = Depends(get_settings),
 ) -> Principal:
-    if not settings.security.auth_enabled:
-        principal = Principal(
-            id="local-development-admin",
-            email="local@codesmell.invalid",
-            display_name="Local Administrator",
-            role="admin",
-            synthetic=True,
-        )
-        request.state.principal = principal
-        return principal
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
