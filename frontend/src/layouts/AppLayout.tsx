@@ -41,8 +41,8 @@ export function AppLayout() {
           ))}
         </nav>
         <div className="sidebar-footer">
-          <div className="version-pill">Enterprise v3.0 · AI Engine</div>
-          <p>Explainable cross-project static analysis & ML prediction.</p>
+          <div className="version-pill">Final Year Capstone Edition · v3.0</div>
+          <p>Explainable multi-language static analysis & AI refactoring engine.</p>
         </div>
       </aside>
       {open && <button className="scrim" onClick={() => setOpen(false)} aria-label="Close navigation" />}

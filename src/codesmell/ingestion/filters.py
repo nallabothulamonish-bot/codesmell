@@ -141,7 +141,7 @@ class PathFilter:
     def language_of(self, relative_path: str) -> Language:
         suffix = PurePosixPath(relative_path.replace("\\", "/")).suffix.lower()
         if not suffix:
-            return Language.UNKNOWN
+            return Language.OTHER
         return LANGUAGE_BY_SUFFIX.get(suffix, Language.OTHER)
 
     def screen(self, relative_path: str, size_bytes: int) -> Rejection | None:

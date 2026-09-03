@@ -33,6 +33,21 @@ from codesmell.jobs.queue import enqueue_job, jobs_query, request_cancel, retry_
 router = APIRouter(prefix="/api/v1", tags=["analyses"], dependencies=[Depends(require_authenticated)])
 
 
+import threading
+
+def _trigger_bg_worker(settings: Settings) -> None:
+    def _target():
+        try:
+            from codesmell.db.session import create_session_factory
+            from codesmell.jobs.service import AnalysisWorker
+            sf = create_session_factory(settings.db)
+            worker = AnalysisWorker(settings, sf)
+            worker.run_once()
+        except Exception:
+            pass
+    threading.Thread(target=_target, daemon=True).start()
+
+
 @router.post(
     "/projects/{project_id}/analyses",
     response_model=AnalysisOut,
@@ -65,7 +80,7 @@ def create_analysis(
                 status_code=409,
                 detail={"message": "some models are missing or disabled", "model_ids": missing},
             )
-    return enqueue_job(
+    job = enqueue_job(
         session,
         project_id=project_id,
         threshold_mode=payload.threshold_mode,
@@ -75,6 +90,8 @@ def create_analysis(
         model_ids=payload.model_ids,
         explain_predictions=payload.explain_predictions,
     )
+    _trigger_bg_worker(settings)
+    return job
 
 
 @router.get("/analyses", response_model=Page[AnalysisOut])
@@ -102,10 +119,16 @@ def list_analyses(
 
 
 @router.get("/analyses/{job_id}", response_model=AnalysisOut)
-def get_analysis(job_id: str, session: Session = Depends(get_session)) -> AnalysisJob:
+def get_analysis(
+    job_id: str,
+    session: Session = Depends(get_session),
+    settings: Settings = Depends(get_settings),
+) -> AnalysisJob:
     job = session.get(AnalysisJob, job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="analysis not found")
+    if job.status == "queued":
+        _trigger_bg_worker(settings)
     return job
 
 
