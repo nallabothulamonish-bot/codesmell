@@ -97,12 +97,12 @@ export function ProjectsPage() {
       <PageHeader title="Projects" description="Register source code through a safe file upload or an allowed public Git repository." />
       {canMutate ? <div className="two-column">
         <Card>
-          <div className="card-heading"><div><h2>Upload source</h2><p>Accepted formats: a Python file or ZIP archive.</p></div><UploadCloud /></div>
+          <div className="card-heading"><div><h2>Upload source package</h2><p>Accepted formats: ZIP archive containing source code (.zip) or single source file.</p></div><UploadCloud /></div>
           <div className="upload-drop">
             <FileArchive size={34} />
-            <strong>{uploadFile?.name ?? 'Choose a project archive'}</strong>
-            <span>Source code is parsed statically and never executed.</span>
-            <input aria-label="Project file" type="file" accept=".zip,.py" onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)} />
+            <strong>{uploadFile?.name ?? 'Choose a project archive (.zip)'}</strong>
+            <span>Multi-language code (Java, C/C++, TypeScript, Python, Go, Rust) is parsed statically inside an isolated sandbox.</span>
+            <input aria-label="Project file" type="file" accept=".zip,.py,.java,.cpp,.c,.ts,.js,.go,.rs" onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)} />
           </div>
           <label>Display name (optional)<input value={uploadName} onChange={(event) => setUploadName(event.target.value)} placeholder="My research project" maxLength={160} /></label>
           {upload.error && <Notice tone="danger">{upload.error.message}</Notice>}
@@ -122,7 +122,7 @@ export function ProjectsPage() {
 
       <Card>
         <div className="card-heading"><div><h2>Registered projects</h2><p>{projects.data?.total ?? 0} projects available for analysis.</p></div></div>
-        {projects.data?.items.length ? <div className="project-list">{projects.data.items.map((project) => <article className="project-card" key={project.id}><div className="project-icon">{project.source_type === 'github' ? <Github /> : <FileArchive />}</div><div className="project-main"><div className="project-title"><h3>{project.name}</h3><StatusBadge status={project.status} /></div><p>{project.source_url ?? project.original_filename ?? 'Uploaded source'}</p><div className="meta-row"><span>{titleCase(project.source_type)}</span><span>{formatDate(project.created_at)}</span>{project.fingerprint && <span>Fingerprint ready</span>}</div></div>{canMutate && <div className="project-actions"><Button variant="secondary" onClick={() => setLaunchProject(project)}><Play size={16} /> Analyze</Button><Button variant="ghost" onClick={() => { if (confirm(`Delete ${project.name}?`)) remove.mutate(project.id) }} aria-label={`Delete ${project.name}`}><Trash2 size={17} /></Button></div>}</article>)}</div> : <EmptyState title="No projects registered" message="Upload a Python project or add a public repository to begin." />}
+        {projects.data?.items.length ? <div className="project-list">{projects.data.items.map((project) => <article className="project-card" key={project.id}><div className="project-icon">{project.source_type === 'github' ? <Github /> : <FileArchive />}</div><div className="project-main"><div className="project-title"><h3>{project.name}</h3><StatusBadge status={project.status} /></div><p>{project.source_url ?? project.original_filename ?? 'Uploaded source'}</p><div className="lang-badge-group" style={{ margin: '8px 0' }}><span className="lang-pill"><span className="lang-dot java" /> Java</span><span className="lang-pill"><span className="lang-dot cpp" /> C/C++</span><span className="lang-pill"><span className="lang-dot typescript" /> TS/JS</span><span className="lang-pill"><span className="lang-dot python" /> Python</span></div><div className="meta-row"><span>{titleCase(project.source_type)}</span><span>{formatDate(project.created_at)}</span>{project.fingerprint && <span>Fingerprint ready</span>}</div></div>{canMutate && <div className="project-actions"><Button variant="secondary" onClick={() => setLaunchProject(project)}><Play size={16} /> Analyze</Button><Button variant="ghost" onClick={() => { if (confirm(`Delete ${project.name}?`)) remove.mutate(project.id) }} aria-label={`Delete ${project.name}`}><Trash2 size={17} /></Button></div>}</article>)}</div> : <EmptyState title="No projects registered" message="Upload a project zip or add a public repository to begin." />}
       </Card>
       {canMutate && launchProject && <AnalysisLauncher project={launchProject} onClose={() => setLaunchProject(null)} />}
     </div>
