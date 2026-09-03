@@ -31,6 +31,20 @@ DEFAULT_MODEL_SPECS: list[dict[str, Any]] = [
         "threshold": 0.5,
     },
     {
+        "name": "Long Method Random Forest Model",
+        "smell_type": SmellType.LONG_METHOD,
+        "kind": ModelKind.RANDOM_FOREST,
+        "feature_names": ["feature__loc", "feature__cyclomatic_complexity", "feature__statement_count"],
+        "threshold": 0.5,
+    },
+    {
+        "name": "Complex Method Gradient Boosting Model",
+        "smell_type": SmellType.COMPLEX_METHOD,
+        "kind": ModelKind.GRADIENT_BOOSTING,
+        "feature_names": ["feature__cyclomatic_complexity", "feature__max_nesting_depth", "feature__cognitive_complexity"],
+        "threshold": 0.5,
+    },
+    {
         "name": "Complex Method Random Forest Model",
         "smell_type": SmellType.COMPLEX_METHOD,
         "kind": ModelKind.RANDOM_FOREST,
@@ -45,9 +59,23 @@ DEFAULT_MODEL_SPECS: list[dict[str, Any]] = [
         "threshold": 0.5,
     },
     {
+        "name": "Long Parameter List Decision Tree Model",
+        "smell_type": SmellType.LONG_PARAMETER_LIST,
+        "kind": ModelKind.DECISION_TREE,
+        "feature_names": ["feature__parameter_count", "feature__parameter_count_excluding_self"],
+        "threshold": 0.5,
+    },
+    {
         "name": "Deep Nesting Logistic Model",
         "smell_type": SmellType.DEEP_NESTING,
         "kind": ModelKind.LOGISTIC,
+        "feature_names": ["feature__max_nesting_depth", "feature__nesting_depth"],
+        "threshold": 0.5,
+    },
+    {
+        "name": "Deep Nesting Gradient Boosting Model",
+        "smell_type": SmellType.DEEP_NESTING,
+        "kind": ModelKind.GRADIENT_BOOSTING,
         "feature_names": ["feature__max_nesting_depth", "feature__nesting_depth"],
         "threshold": 0.5,
     },
@@ -56,6 +84,20 @@ DEFAULT_MODEL_SPECS: list[dict[str, Any]] = [
         "smell_type": SmellType.GOD_CLASS,
         "kind": ModelKind.LOGISTIC,
         "feature_names": ["feature__wmc", "feature__number_of_methods", "feature__number_of_fields", "feature__cbo"],
+        "threshold": 0.5,
+    },
+    {
+        "name": "God Class Random Forest Model",
+        "smell_type": SmellType.GOD_CLASS,
+        "kind": ModelKind.RANDOM_FOREST,
+        "feature_names": ["feature__wmc", "feature__number_of_methods", "feature__number_of_fields", "feature__cbo"],
+        "threshold": 0.5,
+    },
+    {
+        "name": "Large Class Gradient Boosting Model",
+        "smell_type": SmellType.LARGE_CLASS,
+        "kind": ModelKind.GRADIENT_BOOSTING,
+        "feature_names": ["feature__loc", "feature__number_of_methods", "feature__number_of_fields"],
         "threshold": 0.5,
     },
     {
@@ -73,9 +115,9 @@ DEFAULT_MODEL_SPECS: list[dict[str, Any]] = [
         "threshold": 0.5,
     },
     {
-        "name": "Brain Method Logistic Model",
+        "name": "Brain Method Gradient Boosting Model",
         "smell_type": SmellType.BRAIN_METHOD,
-        "kind": ModelKind.LOGISTIC,
+        "kind": ModelKind.GRADIENT_BOOSTING,
         "feature_names": ["feature__loc", "feature__cyclomatic_complexity", "feature__max_nesting_depth"],
         "threshold": 0.5,
     },
@@ -132,17 +174,19 @@ def _create_trained_model_dir(target_dir: Path, spec: dict[str, Any]) -> Path:
 def bootstrap_default_models(session: Session, settings: Settings | None = None) -> list[ModelArtifact]:
     """Ensure default M5 models exist in database and storage."""
     settings = settings or get_settings()
-    existing_count = session.scalar(select(func.count()).select_from(ModelArtifact)) or 0
-    if existing_count > 0:
-        return list(session.scalars(select(ModelArtifact)))
+    existing_models = list(session.scalars(select(ModelArtifact)))
+    existing_names = {m.name for m in existing_models}
 
-    logger.info("no ML models found in database; bootstrapping default M5 models...")
+    missing_specs = [spec for spec in DEFAULT_MODEL_SPECS if spec["name"] not in existing_names]
+    if not missing_specs:
+        return existing_models
+
+    logger.info("bootstrapping %d missing default M5 models...", len(missing_specs))
     registry = ModelRegistry(settings.api.storage_root)
-    registered: list[ModelArtifact] = []
 
     with tempfile.TemporaryDirectory(prefix="codesmell_models_") as tmp:
         base_path = Path(tmp)
-        for idx, spec in enumerate(DEFAULT_MODEL_SPECS):
+        for idx, spec in enumerate(missing_specs):
             model_dir = base_path / f"model_{idx}"
             _create_trained_model_dir(model_dir, spec)
             artifact = registry.register(
@@ -151,7 +195,7 @@ def bootstrap_default_models(session: Session, settings: Settings | None = None)
                 name=spec["name"],
                 enabled=True,
             )
-            registered.append(artifact)
+            existing_models.append(artifact)
 
-    logger.info("successfully bootstrapped %d default ML models", len(registered))
-    return registered
+    logger.info("successfully bootstrapped total %d ML models", len(existing_models))
+    return existing_models

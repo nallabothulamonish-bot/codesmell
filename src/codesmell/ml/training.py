@@ -52,6 +52,19 @@ def build_estimator(
             random_state=seed,
             n_jobs=1,
         )
+    if kind is ModelKind.GRADIENT_BOOSTING:
+        from sklearn.ensemble import HistGradientBoostingClassifier
+        return HistGradientBoostingClassifier(
+            max_iter=int(parameters.get("n_estimators", 100)),
+            random_state=seed,
+        )
+    if kind is ModelKind.DECISION_TREE:
+        from sklearn.tree import DecisionTreeClassifier
+        return DecisionTreeClassifier(
+            max_depth=parameters.get("max_depth", 8),
+            random_state=seed,
+            class_weight="balanced",
+        )
     raise ValueError(f"unsupported model: {kind}")
 
 

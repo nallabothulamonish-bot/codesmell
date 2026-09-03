@@ -14,6 +14,8 @@ class ModelKind(StrEnum):
 
     LOGISTIC = "logistic"
     RANDOM_FOREST = "random_forest"
+    GRADIENT_BOOSTING = "gradient_boosting"
+    DECISION_TREE = "decision_tree"
 
 
 @dataclass(frozen=True, slots=True)
