@@ -77,6 +77,8 @@ class ProjectInventoryBuilder:
             )
 
         source_files, rejections = self._scan(project_root)
+        if not source_files and project_root != root:
+            source_files, rejections = self._scan(root)
 
         if not source_files:
             raise EmptyProjectError(

@@ -132,10 +132,10 @@ class ProjectInventory:
     def summary(self) -> dict[str, Any]:
         return {
             "name": self.name,
-            "source_kind": self.source_kind.value,
-            "primary_language": self.primary_language.value,
-            "languages": {k.value: v for k, v in self.languages.items()},
-            "build_tools": [b.value for b in self.build_tools],
+            "source_kind": self.source_kind.value if hasattr(self.source_kind, "value") else str(self.source_kind),
+            "primary_language": self.primary_language.value if hasattr(self.primary_language, "value") else str(self.primary_language),
+            "languages": { (k.value if hasattr(k, "value") else str(k)): v for k, v in self.languages.items() },
+            "build_tools": [b.value if hasattr(b, "value") else str(b) for b in self.build_tools],
             "file_count": self.file_count,
             "total_lines": self.total_lines,
             "total_bytes": self.total_bytes,
