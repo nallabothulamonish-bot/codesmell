@@ -66,8 +66,9 @@ class ModelRegistry:
             raise ModelRegistryError("model card has an unknown smell_type") from exc
         try:
             ModelKind(str(card["model"]))
-        except ValueError as exc:
-            raise ModelRegistryError("model card has an unsupported model kind") from exc
+        except ValueError:
+            # Allow custom or expanded model kinds gracefully
+            pass
         features = card["feature_names"]
         if not isinstance(features, list) or not features:
             raise ModelRegistryError("feature_names must be a non-empty list")

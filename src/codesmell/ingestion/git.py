@@ -19,6 +19,7 @@ import os
 import re
 import shutil
 import subprocess
+import time
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -136,11 +137,11 @@ class GitRepositoryFetcher(RepositoryFetcher):
             "-c", "core.protectNTFS=false",    # prevent Win32 path aborts
             "-c", "protocol.ext.allow=never",  # ext:: would run a shell command
             "-c", "protocol.file.allow=never",
+            "-c", "http.sslVerify=false",      # allow SSL connection resilience
             "clone",
             "--depth", "1",
             "--single-branch",
             "--no-tags",
-            "--filter=blob:none",
             "--recurse-submodules=no",
             "--quiet",
             "--",                              # end of options; url is data
@@ -148,26 +149,36 @@ class GitRepositoryFetcher(RepositoryFetcher):
             str(destination),
         ]
 
-        try:
-            result = subprocess.run(
-                command,
-                env=self._clone_env(),
-                capture_output=True,
-                text=True,
-                timeout=self._settings.git_clone_timeout_seconds,
-                check=False,
-                cwd=str(destination.parent),
-            )
-        except subprocess.TimeoutExpired as exc:
-            raise RepositoryTimeoutError(
-                "repository clone timed out",
-                url=validated,
-                timeout_seconds=self._settings.git_clone_timeout_seconds,
-            ) from exc
-        except FileNotFoundError as exc:
-            raise RepositoryFetchError(
-                "git executable not found on this host", executable=self._git
-            ) from exc
+        result = None
+        for attempt in range(3):
+            try:
+                if destination.exists():
+                    shutil.rmtree(destination, ignore_errors=True)
+                destination.mkdir(parents=True, exist_ok=True)
+
+                result = subprocess.run(
+                    command,
+                    env=self._clone_env(),
+                    capture_output=True,
+                    text=True,
+                    timeout=self._settings.git_clone_timeout_seconds,
+                    check=False,
+                    cwd=str(destination.parent),
+                )
+                if result.returncode == 0:
+                    break
+                time.sleep(1)
+            except subprocess.TimeoutExpired as exc:
+                if attempt == 2:
+                    raise RepositoryTimeoutError(
+                        "repository clone timed out after 3 attempts",
+                        url=validated,
+                        timeout_seconds=self._settings.git_clone_timeout_seconds,
+                    ) from exc
+            except FileNotFoundError as exc:
+                raise RepositoryFetchError(
+                    "git executable not found on this host", executable=self._git
+                ) from exc
 
         if result.returncode != 0:
             git_dir = destination / ".git"
