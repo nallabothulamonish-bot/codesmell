@@ -25,6 +25,7 @@ export const api = {
   users: () => request<Page<User>>('/api/v1/users?limit=500'),
   createUser: (payload: { email: string; display_name: string; password: string; role: string; enabled: boolean }) => request<User>('/api/v1/users', { method: 'POST', body: JSON.stringify(payload) }),
   updateUser: (id: string, payload: { role?: string; enabled?: boolean; display_name?: string }) => request<User>(`/api/v1/users/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+  resetPassword: (userId: string, password: string) => request<User>(`/api/v1/users/${userId}/password`, { method: 'POST', body: JSON.stringify({ password }) }),
   auditEvents: () => request<Page<AuditEvent>>('/api/v1/users/audit/events?limit=100'),
   health: () => request<{ status: string }>('/health/ready'),
 

@@ -115,7 +115,14 @@ def _create_trained_model_dir(target_dir: Path, spec: dict[str, Any]) -> Path:
         "threshold": spec["threshold"],
         "feature_names": feature_names,
         "model_sha256": digest,
-        "metrics": {"f1": 0.95, "accuracy": 0.96},
+        "metrics": {
+            "precision": 0.942,
+            "recall": 0.958,
+            "f1": 0.950,
+            "roc_auc": 0.976,
+            "accuracy": 0.960,
+            "confusion_matrix": {"tp": 15, "fp": 1, "tn": 14, "fn": 1},
+        },
     }
     card_path = target_dir / "model_card.json"
     card_path.write_text(json.dumps(card, indent=2), encoding="utf-8")

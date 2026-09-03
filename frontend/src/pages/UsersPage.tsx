@@ -14,6 +14,9 @@ export function UsersPage() {
   const [roleFilter, setRoleFilter] = useState('all')
   const [form, setForm] = useState({ email: '', display_name: '', password: '', role: 'viewer', enabled: true })
   
+  const [resetModalUser, setResetModalUser] = useState<{ id: string; name: string } | null>(null)
+  const [resetPasswordText, setResetPasswordText] = useState('')
+
   const create = useMutation({
     mutationFn: () => api.createUser(form),
     onSuccess: () => {
@@ -28,6 +31,19 @@ export function UsersPage() {
       api.updateUser(id, { ...(enabled !== undefined && { enabled }), ...(role !== undefined && { role }) }),
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: ['users'] })
+      void client.invalidateQueries({ queryKey: ['audit'] })
+    }
+  })
+
+  const resetPassword = useMutation({
+    mutationFn: () => {
+      if (!resetModalUser) throw new Error('No user selected')
+      return api.resetPassword(resetModalUser.id, resetPasswordText)
+    },
+    onSuccess: () => {
+      setResetModalUser(null)
+      setResetPasswordText('')
+      alert('Password reset successfully!')
       void client.invalidateQueries({ queryKey: ['audit'] })
     }
   })
@@ -251,12 +267,21 @@ export function UsersPage() {
                     </span>
                   </td>
                   <td>
-                    <Button
-                      variant={user.enabled ? 'secondary' : 'primary'}
-                      onClick={() => update.mutate({ id: user.id, enabled: !user.enabled })}
-                    >
-                      {user.enabled ? 'Disable Account' : 'Enable Account'}
-                    </Button>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <Button
+                        variant={user.enabled ? 'secondary' : 'primary'}
+                        onClick={() => update.mutate({ id: user.id, enabled: !user.enabled })}
+                      >
+                        {user.enabled ? 'Disable Account' : 'Enable Account'}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        onClick={() => setResetModalUser({ id: user.id, name: user.display_name })}
+                        title="Reset Password"
+                      >
+                        <Lock size={15} /> Reset Password
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               )) : (
@@ -296,6 +321,52 @@ export function UsersPage() {
           <p style={{ color: 'var(--text-muted)' }}>No audit events recorded yet.</p>
         )}
       </Card>
+
+      {/* Password Reset Modal Dialog */}
+      {resetModalUser && (
+        <div
+          className="modal-backdrop"
+          role="presentation"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setResetModalUser(null) }}
+        >
+          <Card className="modal-card">
+            <div className="card-heading">
+              <div>
+                <h2>Reset User Password</h2>
+                <p>Account: <strong>{resetModalUser.name}</strong></p>
+              </div>
+              <button className="icon-button" onClick={() => setResetModalUser(null)}>×</button>
+            </div>
+            <div className="form-grid" style={{ marginTop: '16px' }}>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <strong>New Secure Password</strong>
+                <input
+                  type="password"
+                  minLength={8}
+                  value={resetPasswordText}
+                  onChange={(e) => setResetPasswordText(e.target.value)}
+                  placeholder="Enter new password (min 8 chars)..."
+                  required
+                />
+              </label>
+            </div>
+            {resetPassword.error && (
+              <div style={{ marginTop: '12px' }}>
+                <Notice tone="danger">{resetPassword.error.message}</Notice>
+              </div>
+            )}
+            <div className="modal-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '20px' }}>
+              <Button variant="secondary" onClick={() => setResetModalUser(null)}>Cancel</Button>
+              <Button
+                onClick={() => resetPassword.mutate()}
+                disabled={resetPassword.isPending || resetPasswordText.length < 8}
+              >
+                <Lock size={16} /> {resetPassword.isPending ? 'Resetting...' : 'Confirm Reset Password'}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }
