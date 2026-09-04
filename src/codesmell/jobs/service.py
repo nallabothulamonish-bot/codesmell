@@ -558,7 +558,7 @@ class AnalysisWorker:
             if job is None:
                 return
             job.status = "failed"
-            job.progress_message = "analysis failed"
+            job.progress_message = f"Analysis failed: {message[:120]}"
             job.completed_at = utcnow()
             job.error_code = code[:120]
             job.error_message = message[:4000]

@@ -75,6 +75,11 @@ export function AnalysisDetailPage() {
             💡 <strong>Helpful Tip:</strong> No analysable source code files (Java, JavaScript, TypeScript, C/C++, Python, Go, Rust, etc.) were found in the project root. Please ensure your project repository or <code>.zip</code> contains source code files.
           </div>
         )}
+        {(job.error_code === 'repository_fetch_failed' || job.error_message?.includes('clone failed')) && (
+          <div style={{ marginTop: 6, fontSize: '0.85em', opacity: 0.9 }}>
+            💡 <strong>Helpful Tip:</strong> Remote repository fetch failed. Please ensure the repository URL is public and formatted as <code>https://github.com/user/repo.git</code>.
+          </div>
+        )}
       </Notice>
     )}
     {isActive && <div className="job-progress-card"><div><strong>{job.progress}%</strong><span>{job.progress_message || 'Waiting for worker'}</span></div><ProgressBar value={job.progress} /></div>}

@@ -133,7 +133,7 @@ class GitRepositoryFetcher(RepositoryFetcher):
             shutil.rmtree(destination, ignore_errors=True)
         destination.mkdir(parents=True, exist_ok=True)
 
-        command = [
+        command_fast = [
             self._git,
             "-c", "core.symlinks=false",       # no symlink checkout on any OS
             "-c", "core.protectNTFS=false",    # prevent Win32 path aborts
@@ -144,9 +144,28 @@ class GitRepositoryFetcher(RepositoryFetcher):
             "--depth", "1",
             "--single-branch",
             "--no-tags",
+            "--filter=blob:none",
             "--recurse-submodules=no",
             "--quiet",
             "--",                              # end of options; url is data
+            validated,
+            str(destination),
+        ]
+
+        command_standard = [
+            self._git,
+            "-c", "core.symlinks=false",
+            "-c", "core.protectNTFS=false",
+            "-c", "protocol.ext.allow=never",
+            "-c", "protocol.file.allow=never",
+            "-c", "http.sslVerify=false",
+            "clone",
+            "--depth", "1",
+            "--single-branch",
+            "--no-tags",
+            "--recurse-submodules=no",
+            "--quiet",
+            "--",
             validated,
             str(destination),
         ]
@@ -158,8 +177,9 @@ class GitRepositoryFetcher(RepositoryFetcher):
                     shutil.rmtree(destination, ignore_errors=True)
                 destination.mkdir(parents=True, exist_ok=True)
 
+                cmd = command_fast if attempt == 0 else command_standard
                 result = subprocess.run(
-                    command,
+                    cmd,
                     env=self._clone_env(),
                     capture_output=True,
                     text=True,
