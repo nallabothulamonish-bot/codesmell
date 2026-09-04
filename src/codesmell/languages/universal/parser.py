@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import re
 
+from pathlib import PurePosixPath
+
 from codesmell.core.enums import EntityType, Language
 from codesmell.core.models import CodeEntity, EntityFacts, ParsedModule, SourceFile
 from codesmell.core.ports import SourceParser
@@ -108,7 +110,8 @@ class UniversalParser(SourceParser):
 
         # Fallback entity generation: guarantee every file has class/method representation
         if len(entities) == 1 and loc > 0:
-            stem_clean = "".join(c for c in source_file.stem if c.isalnum() or c == "_") or "MainComponent"
+            file_stem = PurePosixPath(source_file.relative_path.replace("\\", "/")).stem
+            stem_clean = "".join(c for c in file_stem if c.isalnum() or c == "_") or "MainComponent"
             synth_class_name = stem_clean[0].upper() + stem_clean[1:]
             synth_class = CodeEntity(
                 entity_id=f"cls:{source_file.relative_path}:{synth_class_name}:1",

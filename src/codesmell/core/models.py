@@ -66,6 +66,10 @@ class SourceFile:
         return PurePosixPath(self.relative_path.replace("\\", "/")).name
 
     @property
+    def stem(self) -> str:
+        return PurePosixPath(self.relative_path.replace("\\", "/")).stem
+
+    @property
     def package_path(self) -> str:
         """Dotted package path, e.g. ``pkg/sub/mod.py`` -> ``pkg.sub.mod``."""
         p = PurePosixPath(self.relative_path.replace("\\", "/"))

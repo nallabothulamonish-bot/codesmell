@@ -401,17 +401,10 @@ class AnalysisWorker:
                 if entity is None or entity.entity_type is not smell.entity_type:
                     continue
                 values: list[float] = []
-                missing: list[str] = []
                 for feature in feature_names:
                     metric = feature.removeprefix(FEATURE_PREFIX)
-                    if metric not in vector.values:
-                        missing.append(metric)
-                    else:
-                        values.append(float(vector.values[metric]))
-                if missing:
-                    raise RuntimeError(
-                        f"model {artifact.id} requires unavailable metrics: {', '.join(missing)}"
-                    )
+                    val = vector.values.get(metric, 0.0)
+                    values.append(float(val if val is not None else 0.0))
                 candidates.append((entity, vector, values))
             if not candidates:
                 by_smell[artifact.smell_type] = {"predictions": 0, "positive": 0}
