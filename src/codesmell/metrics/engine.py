@@ -239,9 +239,9 @@ class MetricsEngine:
                     elif schema_feature == "number_of_fields":
                         values["number_of_fields"] = float(len(facts.declared_fields))
                     elif schema_feature == "number_of_methods":
-                        values["number_of_methods"] = float(len(context.children_for(entity.qualified_name)))
+                        values["number_of_methods"] = float(len(context.children_of(entity)))
                     elif schema_feature == "wmc":
-                        values["wmc"] = float(max(1, len(context.children_for(entity.qualified_name))))
+                        values["wmc"] = float(max(1, len(context.children_of(entity))))
                     elif schema_feature == "cyclomatic_complexity":
                         values["cyclomatic_complexity"] = 2.0
                     elif schema_feature == "cognitive_complexity":

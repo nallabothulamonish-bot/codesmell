@@ -165,6 +165,10 @@ class ProjectAnalysisContext:
     def children_of(self, entity: CodeEntity) -> Sequence[CodeEntity]:
         return tuple(self._children.get(entity.qualified_name, ()))
 
+    def children_for(self, target: CodeEntity | str) -> Sequence[CodeEntity]:
+        key = target.qualified_name if isinstance(target, CodeEntity) else str(target)
+        return tuple(self._children.get(key, ()))
+
     def methods_of(self, entity: CodeEntity) -> tuple[CodeEntity, ...]:
         """Direct methods of a class, excluding nested classes."""
         return tuple(
