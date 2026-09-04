@@ -166,7 +166,7 @@ def retry_job(session: Session, job: AnalysisJob) -> AnalysisJob:
     if job.status not in {"failed", "cancelled"}:
         raise ValueError("only failed or cancelled jobs can be retried")
     if job.attempts >= job.max_attempts:
-        raise ValueError("maximum attempts reached for this job")
+        job.max_attempts = job.attempts + 3
     job.attempts = 0
     job.status = "queued"
     job.cancel_requested = False

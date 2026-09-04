@@ -127,7 +127,13 @@ class AnalysisWorker:
             project = session.get(Project, job.project_id)
             if project is None:
                 raise RuntimeError("job project no longer exists")
-            threshold_mode = ThresholdMode(job.threshold_mode)
+            try:
+                threshold_mode = ThresholdMode(job.threshold_mode)
+            except ValueError:
+                if "percentile" in str(job.threshold_mode).lower() or "relative" in str(job.threshold_mode).lower():
+                    threshold_mode = ThresholdMode.PERCENTILE
+                else:
+                    threshold_mode = ThresholdMode.ABSOLUTE
             severity_floor = Severity(job.min_severity)
             analysis_kind = job.analysis_kind
             requested_model_ids = list(job.model_ids or [])

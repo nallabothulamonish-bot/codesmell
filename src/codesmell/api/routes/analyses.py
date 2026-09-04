@@ -141,12 +141,18 @@ def cancel_analysis(job_id: str, session: Session = Depends(get_session)) -> Ana
 
 
 @router.post("/analyses/{job_id}/retry", response_model=AnalysisOut, dependencies=[Depends(require_roles("admin", "analyst"))])
-def retry_analysis(job_id: str, session: Session = Depends(get_session)) -> AnalysisJob:
+def retry_analysis(
+    job_id: str,
+    session: Session = Depends(get_session),
+    settings: Settings = Depends(get_settings),
+) -> AnalysisJob:
     job = session.get(AnalysisJob, job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="analysis not found")
     try:
-        return retry_job(session, job)
+        retried_job = retry_job(session, job)
+        _trigger_bg_worker(settings)
+        return retried_job
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
