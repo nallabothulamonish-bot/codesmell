@@ -136,12 +136,13 @@ class GitRepositoryFetcher(RepositoryFetcher):
         progress_callback: Callable[[int, str], None] | None = None,
     ) -> FetchReport:
         validated = self.validate(url)
+        destination.parent.mkdir(parents=True, exist_ok=True)
         if destination.exists():
             shutil.rmtree(destination, ignore_errors=True)
-        destination.mkdir(parents=True, exist_ok=True)
 
         command = [
             self._git,
+            "-c", "core.longpaths=true",       # Win32 long path support (>260 chars)
             "-c", "core.symlinks=false",       # no symlink checkout on any OS
             "-c", "core.protectNTFS=false",    # prevent Win32 path aborts
             "-c", "protocol.ext.allow=never",  # ext:: would run a shell command
@@ -164,9 +165,9 @@ class GitRepositoryFetcher(RepositoryFetcher):
 
         for attempt in range(3):
             try:
+                destination.parent.mkdir(parents=True, exist_ok=True)
                 if destination.exists():
                     shutil.rmtree(destination, ignore_errors=True)
-                destination.mkdir(parents=True, exist_ok=True)
 
                 if progress_callback:
                     progress_callback(5, f"Cloning repository {self.repository_name(validated)}...")
