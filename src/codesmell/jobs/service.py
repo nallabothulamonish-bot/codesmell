@@ -268,6 +268,8 @@ class AnalysisWorker:
             session.execute(
                 delete(EntityMetricRecord).where(EntityMetricRecord.job_id == job_id)
             )
+            session.commit()
+            count = 0
             for entity_id, vector in analysis.features.items():
                 entity = analysis.context.entity_by_id(entity_id)
                 if entity is None:
@@ -285,6 +287,9 @@ class AnalysisWorker:
                         metrics=dict(vector.values),
                     )
                 )
+                count += 1
+                if count % 500 == 0:
+                    session.commit()
             session.commit()
 
     def _persist_findings(
