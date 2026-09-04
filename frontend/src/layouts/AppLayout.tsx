@@ -41,7 +41,7 @@ export function AppLayout() {
           ))}
         </nav>
         <div className="sidebar-footer">
-          <div className="version-pill">Final Year Capstone Edition · v3.0</div>
+          <div className="version-pill">Enterprise Edition · v3.0</div>
           <p>Explainable multi-language static analysis & AI refactoring engine.</p>
         </div>
       </aside>

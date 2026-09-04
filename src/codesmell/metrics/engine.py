@@ -217,7 +217,7 @@ class MetricsEngine:
             for calculator in self._calculators:
                 if entity.entity_type not in calculator.applies_to:
                     continue
-                if calculator.language is entity.language or entity.language != Language.PYTHON:
+                if calculator.language is entity.language or calculator.language is Language.OTHER:
                     try:
                         computed = self._compute_one(calculator, entity, context)
                         values.update(computed)
