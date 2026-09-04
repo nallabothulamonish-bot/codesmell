@@ -154,8 +154,13 @@ class AnalysisWorker:
                     raise RuntimeError("job project no longer exists")
                 source = self._materialize_source(project, workspace)
             self._progress(job_id, 15, f"fetching source files for {project.name}")
-            self._check_cancel(job_id)
-            ingested = self.container.ingestion_service(workspace).ingest(source)
+            def on_progress(pct: int, msg: str) -> None:
+                scaled_pct = 5 + int((pct / 100.0) * 25)
+                self._progress(job_id, scaled_pct, msg)
+
+            ingested = self.container.ingestion_service(workspace).ingest(
+                source, progress_callback=on_progress
+            )
             self._persist_inventory(job_id, ingested.inventory)
             self._progress(job_id, 35, f"ingested {len(ingested.inventory.source_files)} source files")
             self._check_cancel(job_id)

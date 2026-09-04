@@ -64,14 +64,18 @@ class IngestionService:
     # Public intake paths
     # ------------------------------------------------------------------ #
 
-    def ingest(self, source: str | Path) -> IngestionResult:
+    def ingest(
+        self,
+        source: str | Path,
+        progress_callback: Callable[[int, str], None] | None = None,
+    ) -> IngestionResult:
         """Dispatch on the shape of ``source``.
 
         A string that parses as a valid repository URL is cloned; otherwise the
         value is treated as a filesystem path.
         """
         if isinstance(source, str) and self._fetcher.supports(source):
-            return self.ingest_repository(source)
+            return self.ingest_repository(source, progress_callback=progress_callback)
 
         path = Path(source)
         if path.is_dir():
@@ -155,10 +159,14 @@ class IngestionService:
         )
         return self._finish(inventory, destination)
 
-    def ingest_repository(self, url: str) -> IngestionResult:
+    def ingest_repository(
+        self,
+        url: str,
+        progress_callback: Callable[[int, str], None] | None = None,
+    ) -> IngestionResult:
         """Clone a public HTTPS repository, then inventory the working tree."""
         destination = self._workspace.source_dir / "repo"
-        report = self._fetcher.fetch(url, destination)
+        report = self._fetcher.fetch(url, destination, progress_callback=progress_callback)
 
         project_root = self._inventory.resolve_root(destination)
         inventory = self._inventory.build(

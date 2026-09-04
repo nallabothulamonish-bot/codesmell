@@ -64,7 +64,12 @@ class RepositoryFetcher(ABC):
         """Whether this fetcher can handle the URL scheme and host."""
 
     @abstractmethod
-    def fetch(self, url: str, destination: Path) -> FetchReport:
+    def fetch(
+        self,
+        url: str,
+        destination: Path,
+        progress_callback: Callable[[int, str], None] | None = None,
+    ) -> FetchReport:
         """Clone ``url`` into ``destination``.
 
         Implementations MUST validate the URL before touching the network and

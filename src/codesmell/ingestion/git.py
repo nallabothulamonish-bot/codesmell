@@ -129,13 +129,18 @@ class GitRepositoryFetcher(RepositoryFetcher):
     # Fetch
     # ------------------------------------------------------------------ #
 
-    def fetch(self, url: str, destination: Path) -> FetchReport:
+    def fetch(
+        self,
+        url: str,
+        destination: Path,
+        progress_callback: Callable[[int, str], None] | None = None,
+    ) -> FetchReport:
         validated = self.validate(url)
         if destination.exists():
             shutil.rmtree(destination, ignore_errors=True)
         destination.mkdir(parents=True, exist_ok=True)
 
-        command_fast = [
+        command = [
             self._git,
             "-c", "core.symlinks=false",       # no symlink checkout on any OS
             "-c", "core.protectNTFS=false",    # prevent Win32 path aborts
@@ -146,50 +151,61 @@ class GitRepositoryFetcher(RepositoryFetcher):
             "--depth", "1",
             "--single-branch",
             "--no-tags",
-            "--filter=blob:none",
             "--recurse-submodules=no",
-            "--quiet",
+            "--progress",
             "--",                              # end of options; url is data
             validated,
             str(destination),
         ]
 
-        command_standard = [
-            self._git,
-            "-c", "core.symlinks=false",
-            "-c", "core.protectNTFS=false",
-            "-c", "protocol.ext.allow=never",
-            "-c", "protocol.file.allow=never",
-            "-c", "http.sslVerify=false",
-            "clone",
-            "--depth", "1",
-            "--single-branch",
-            "--no-tags",
-            "--recurse-submodules=no",
-            "--quiet",
-            "--",
-            validated,
-            str(destination),
-        ]
+        result_returncode = -1
+        result_stderr = ""
+        pct_pattern = re.compile(r"(Receiving objects|Resolving deltas|Cloning into):\s*(\d+)?%")
 
-        result = None
         for attempt in range(3):
             try:
                 if destination.exists():
                     shutil.rmtree(destination, ignore_errors=True)
                 destination.mkdir(parents=True, exist_ok=True)
 
-                cmd = command_fast if attempt == 0 else command_standard
-                result = subprocess.run(
-                    cmd,
+                if progress_callback:
+                    progress_callback(5, f"Cloning repository {self.repository_name(validated)}...")
+
+                proc = subprocess.Popen(
+                    command,
                     env=self._clone_env(),
-                    capture_output=True,
+                    stderr=subprocess.PIPE,
+                    stdout=subprocess.DEVNULL,
                     text=True,
-                    timeout=self._settings.git_clone_timeout_seconds,
-                    check=False,
+                    bufsize=1,
                     cwd=str(destination.parent),
                 )
-                if result.returncode == 0 and _working_tree_size(destination) > 0:
+                
+                # Monitor progress
+                start_time = time.time()
+                while True:
+                    if time.time() - start_time > self._settings.git_clone_timeout_seconds:
+                        proc.kill()
+                        raise subprocess.TimeoutExpired(command, self._settings.git_clone_timeout_seconds)
+                    
+                    line = proc.stderr.readline()
+                    if not line and proc.poll() is not None:
+                        break
+                    if line:
+                        result_stderr += line
+                        if progress_callback:
+                            match = pct_pattern.search(line)
+                            if match:
+                                stage_name, pct_str = match.groups()
+                                if pct_str:
+                                    pct_val = int(pct_str)
+                                    progress_callback(pct_val, f"Git clone: {stage_name} {pct_val}%")
+                                else:
+                                    progress_callback(10, f"Git clone: {stage_name}")
+                
+                result_returncode = proc.wait()
+                
+                if result_returncode == 0 and _working_tree_size(destination) > 0:
                     break
                 time.sleep(1)
             except subprocess.TimeoutExpired as exc:
