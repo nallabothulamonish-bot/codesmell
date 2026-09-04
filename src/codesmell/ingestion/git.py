@@ -177,31 +177,40 @@ class GitRepositoryFetcher(RepositoryFetcher):
                     stderr=subprocess.PIPE,
                     stdout=subprocess.DEVNULL,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     bufsize=1,
                     cwd=str(destination.parent),
                 )
                 
-                # Monitor progress
+                buffer = ""
+                last_pct = -1
                 start_time = time.time()
                 while True:
                     if time.time() - start_time > self._settings.git_clone_timeout_seconds:
                         proc.kill()
                         raise subprocess.TimeoutExpired(command, self._settings.git_clone_timeout_seconds)
-                    
-                    line = proc.stderr.readline()
-                    if not line and proc.poll() is not None:
+
+                    chunk = proc.stderr.read(128) if proc.stderr else ""
+                    if not chunk and proc.poll() is not None:
                         break
-                    if line:
-                        result_stderr += line
-                        if progress_callback:
-                            match = pct_pattern.search(line)
-                            if match:
-                                stage_name, pct_str = match.groups()
-                                if pct_str:
-                                    pct_val = int(pct_str)
-                                    progress_callback(pct_val, f"Git clone: {stage_name} {pct_val}%")
-                                else:
-                                    progress_callback(10, f"Git clone: {stage_name}")
+                    if chunk:
+                        buffer += chunk
+                        result_stderr += chunk
+                        parts = re.split(r"[\r\n]+", buffer)
+                        buffer = parts[-1]
+                        for line in parts[:-1]:
+                            if progress_callback and line.strip():
+                                match = pct_pattern.search(line)
+                                if match:
+                                    stage_name, pct_str = match.groups()
+                                    if pct_str:
+                                        pct_val = int(pct_str)
+                                        if pct_val != last_pct:
+                                            last_pct = pct_val
+                                            progress_callback(pct_val, f"Git clone: {stage_name} {pct_val}%")
+                                    else:
+                                        progress_callback(10, f"Git clone: {stage_name}")
                 
                 result_returncode = proc.wait()
                 
@@ -236,6 +245,8 @@ class GitRepositoryFetcher(RepositoryFetcher):
                         capture_output=True,
                         timeout=60,
                         check=False,
+                        encoding="utf-8",
+                        errors="replace",
                     )
                     if _working_tree_size(destination) > 0:
                         break
@@ -243,11 +254,11 @@ class GitRepositoryFetcher(RepositoryFetcher):
                     pass
 
         if _working_tree_size(destination) == 0:
-            stderr_msg = _sanitise(result.stderr) if result and result.stderr else "no files checked out"
+            stderr_msg = _sanitise(result_stderr) if result_stderr else "no files checked out"
             raise RepositoryFetchError(
                 "repository clone failed: no source files were checked out",
                 url=validated,
-                exit_code=result.returncode if result else -1,
+                exit_code=result_returncode,
                 stderr=stderr_msg,
             )
 
