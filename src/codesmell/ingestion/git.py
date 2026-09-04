@@ -115,7 +115,9 @@ class GitRepositoryFetcher(RepositoryFetcher):
                 path=parsed.path,
             )
 
-        return candidate
+        owner, repo = path_parts[0], path_parts[1]
+        repo_clean = repo[:-4] if repo.endswith(".git") else repo
+        return f"https://{host}/{owner}/{repo_clean}.git"
 
     def repository_name(self, url: str) -> str:
         """Derive a safe project name from the URL's last path segment."""

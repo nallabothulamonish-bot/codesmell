@@ -101,7 +101,42 @@ export function OverviewPanel({ analysis, findings, predictions, recommendations
   const displayTN = isCompleted ? perf.tn : 0
   const displayTotal = isCompleted ? perf.total : 0
 
+  // Calculate Maintainability Index & Project Health Grade
+  const highPriority = findings.filter((item) => ['high', 'critical'].includes(item.severity)).length
+  const miRaw = isCompleted ? Math.max(15, Math.round(98 - (findings.length * 1.8) - (highPriority * 3.5))) : 100
+  const mi = isCompleted ? miRaw : 0
+  const grade = !isCompleted ? '—' : mi >= 88 ? 'A+' : mi >= 78 ? 'A' : mi >= 65 ? 'B' : mi >= 50 ? 'C' : 'D'
+  const gradeColor = !isCompleted ? 'var(--text-secondary)' : mi >= 78 ? '#10b981' : mi >= 60 ? '#f59e0b' : '#f43f5e'
+  const inventoryData = analysis.summary?.inventory as { file_count?: number } | undefined
+
   return <>
+    <Card className="health-scorecard-card">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+        <div>
+          <span style={{ fontSize: '0.85em', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', fontWeight: 600 }}>Project Maintainability Index</span>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginTop: 4 }}>
+            <span style={{ fontSize: '2.5rem', fontWeight: 800, color: gradeColor }}>{isCompleted ? `${mi}%` : '—'}</span>
+            <span style={{ fontSize: '1.25rem', fontWeight: 700, padding: '2px 10px', borderRadius: 8, background: `${gradeColor}18`, color: gradeColor, border: `1px solid ${gradeColor}40` }}>Grade {grade}</span>
+          </div>
+          <p style={{ margin: '4px 0 0 0', fontSize: '0.9em', color: 'var(--text-secondary)' }}>
+            {isCompleted ? (mi >= 78 ? 'Clean codebase with minimal technical debt and low defect risk.' : mi >= 60 ? 'Moderate code quality. Refactoring recommended for high-priority smells.' : 'Substantial technical debt detected. Urgent refactoring advised.') : 'Analysis processing...'}
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 24 }}>
+          <div style={{ textAlign: 'right' }}>
+            <span style={{ fontSize: '0.8em', color: 'var(--text-secondary)', display: 'block' }}>Smell Density</span>
+            <strong style={{ fontSize: '1.2rem', color: 'var(--text)' }}>{isCompleted ? `${(findings.length / Math.max(1, inventoryData?.file_count ?? 1)).toFixed(1)} / file` : '—'}</strong>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <span style={{ fontSize: '0.8em', color: 'var(--text-secondary)', display: 'block' }}>Risk Level</span>
+            <strong style={{ fontSize: '1.2rem', color: highPriority > 3 ? '#f43f5e' : highPriority > 0 ? '#f59e0b' : '#10b981' }}>
+              {isCompleted ? (highPriority > 3 ? 'High Risk' : highPriority > 0 ? 'Medium Risk' : 'Low Risk') : '—'}
+            </strong>
+          </div>
+        </div>
+      </div>
+    </Card>
+
     <div className="stats-grid compact">
       <StatCard label="Rule findings" value={findings.length} hint={`${findings.filter((item) => ['high', 'critical'].includes(item.severity)).length} high priority`} icon={<AlertTriangle />} />
       <StatCard label="ML predictions" value={predictions.length} hint={`${positives} predicted positive`} icon={<BrainCircuit />} />
