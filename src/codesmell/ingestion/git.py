@@ -129,6 +129,8 @@ class GitRepositoryFetcher(RepositoryFetcher):
 
     def fetch(self, url: str, destination: Path) -> FetchReport:
         validated = self.validate(url)
+        if destination.exists():
+            shutil.rmtree(destination, ignore_errors=True)
         destination.mkdir(parents=True, exist_ok=True)
 
         command = [
@@ -165,7 +167,7 @@ class GitRepositoryFetcher(RepositoryFetcher):
                     check=False,
                     cwd=str(destination.parent),
                 )
-                if result.returncode == 0:
+                if result.returncode == 0 and _working_tree_size(destination) > 0:
                     break
                 time.sleep(1)
             except subprocess.TimeoutExpired as exc:
@@ -180,28 +182,36 @@ class GitRepositoryFetcher(RepositoryFetcher):
                     "git executable not found on this host", executable=self._git
                 ) from exc
 
-        if result.returncode != 0:
-            git_dir = destination / ".git"
-            # If clone downloaded .git but checkout failed (e.g. invalid Windows path), recover valid files
-            if git_dir.is_dir():
+        # If checkout produced warnings/non-zero returncode but .git exists, attempt force checkout
+        git_dir = destination / ".git"
+        if git_dir.is_dir() and _working_tree_size(destination) == 0:
+            for checkout_cmd in [
+                [self._git, "checkout-index", "-a", "-f"],
+                [self._git, "checkout", "-f", "HEAD"],
+                [self._git, "restore", "."],
+            ]:
                 try:
                     subprocess.run(
-                        [self._git, "checkout-index", "-a", "-f"],
+                        checkout_cmd,
                         cwd=str(destination),
                         env=self._clone_env(),
                         capture_output=True,
                         timeout=60,
                         check=False,
                     )
+                    if _working_tree_size(destination) > 0:
+                        break
                 except Exception:
                     pass
-            if _directory_size(destination) == 0:
-                raise RepositoryFetchError(
-                    "repository clone failed",
-                    url=validated,
-                    exit_code=result.returncode,
-                    stderr=_sanitise(result.stderr),
-                )
+
+        if _working_tree_size(destination) == 0:
+            stderr_msg = _sanitise(result.stderr) if result and result.stderr else "no files checked out"
+            raise RepositoryFetchError(
+                "repository clone failed: no source files were checked out",
+                url=validated,
+                exit_code=result.returncode if result else -1,
+                stderr=stderr_msg,
+            )
 
         revision = self._head_revision(destination)
         bytes_written = _directory_size(destination)
@@ -258,6 +268,19 @@ def _sanitise(text: str, limit: int = 500) -> str:
 def _directory_size(path: Path) -> int:
     total = 0
     for dirpath, _dirnames, filenames in os.walk(path):
+        for filename in filenames:
+            candidate = Path(dirpath) / filename
+            if candidate.is_symlink() or not candidate.is_file():
+                continue
+            total += candidate.stat().st_size
+    return total
+
+
+def _working_tree_size(path: Path) -> int:
+    """Calculate size of non-.git files in working tree."""
+    total = 0
+    for dirpath, dirnames, filenames in os.walk(path):
+        dirnames[:] = [d for d in dirnames if d != ".git"]
         for filename in filenames:
             candidate = Path(dirpath) / filename
             if candidate.is_symlink() or not candidate.is_file():

@@ -82,6 +82,19 @@ LANGUAGE_BY_SUFFIX: dict[str, Language] = {
     ".swift": Language.SWIFT,
     ".rb": Language.RUBY,
     ".php": Language.PHP,
+    # Shell / SQL / Data / Config
+    ".sh": Language.OTHER,
+    ".bash": Language.OTHER,
+    ".zsh": Language.OTHER,
+    ".ps1": Language.OTHER,
+    ".sql": Language.OTHER,
+    ".json": Language.OTHER,
+    ".toml": Language.OTHER,
+    ".yaml": Language.OTHER,
+    ".yml": Language.OTHER,
+    ".xml": Language.OTHER,
+    ".md": Language.OTHER,
+    ".txt": Language.OTHER,
 }
 
 _NULL_SNIFF_BYTES = 8192

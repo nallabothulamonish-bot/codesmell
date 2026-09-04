@@ -81,6 +81,10 @@ class ProjectInventoryBuilder:
             source_files, rejections = self._scan(root)
 
         if not source_files:
+            source_files, fallback_rejections = self._fallback_scan(project_root)
+            rejections.extend(fallback_rejections)
+
+        if not source_files:
             raise EmptyProjectError(
                 "no analysable source files were found after filtering",
                 project=name,
@@ -227,6 +231,51 @@ class ProjectInventoryBuilder:
                     )
 
             if limit_reached:
+                break
+
+        return source_files, rejections
+
+    def _fallback_scan(self, root: Path) -> tuple[list[SourceFile], list[Rejection]]:
+        """Fallback scan for non-standard repos, accepting all readable non-binary files."""
+        source_files: list[SourceFile] = []
+        rejections: list[Rejection] = []
+        skip_dirs = {".git", ".hg", ".svn"}
+
+        for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
+            dirnames[:] = [d for d in sorted(dirnames) if d not in skip_dirs]
+            directory = Path(dirpath)
+
+            for filename in sorted(filenames):
+                path = directory / filename
+                relative = _relative_posix(path, root)
+                if path.is_symlink() or not path.is_file():
+                    continue
+
+                try:
+                    stat_result = path.stat()
+                except OSError:
+                    continue
+
+                if looks_binary(path):
+                    continue
+
+                text = read_source(path)
+                if text is None:
+                    continue
+
+                source_files.append(
+                    SourceFile(
+                        relative_path=relative,
+                        language=self._filter.language_of(relative),
+                        size_bytes=stat_result.st_size,
+                        line_count=count_lines(text),
+                        sha256=hashlib.sha256(text.encode("utf-8")).hexdigest(),
+                    )
+                )
+                if len(source_files) >= self._settings.max_source_files:
+                    break
+
+            if len(source_files) >= self._settings.max_source_files:
                 break
 
         return source_files, rejections

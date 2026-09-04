@@ -124,6 +124,8 @@ class AnalysisWorker:
             job = session.get(AnalysisJob, job_id)
             if job is None:
                 return
+            job.error_code = None
+            job.error_message = None
             project = session.get(Project, job.project_id)
             if project is None:
                 raise RuntimeError("job project no longer exists")
@@ -138,6 +140,7 @@ class AnalysisWorker:
             analysis_kind = job.analysis_kind
             requested_model_ids = list(job.model_ids or [])
             should_explain = job.explain_predictions
+            session.commit()
 
         self._progress(job_id, 5, "creating isolated workspace")
         self._check_cancel(job_id)
